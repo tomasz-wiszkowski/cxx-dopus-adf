@@ -669,7 +669,8 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
 
                     if (!result) {
                         HANDLE filename = CreateFile(FinalName.c_str(), FILE_WRITE_ATTRIBUTES, 0, 0, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-                        SetFileTime(filename, 0, 0, &GetFileTime(entry));
+                        auto entryTime = GetFileTime(entry);
+                        SetFileTime(filename, 0, 0, &entryTime);
                         CloseHandle(filename);
                     }
                 }
@@ -732,7 +733,8 @@ int cADFPluginData::ExtractFile(LPVFSBATCHDATAW lpBatchData, const Entry* pEntry
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STEPBYTES, (DWORD_PTR)pEntry->size);
 
     HANDLE filename = CreateFile(pDest.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    SetFileTime(filename, 0, 0, &GetFileTime(pEntry));
+	auto entryTime = GetFileTime(pEntry);
+    SetFileTime(filename, 0, 0, &entryTime);
     CloseHandle(filename);
 
     adfCloseFile(file);

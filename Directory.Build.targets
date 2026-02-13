@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <DOpusSdkDir>$(SolutionDir)external\dopus_sdk</DOpusSdkDir>
+    <DOpusSdkZip>$(SolutionDir)external\opus_sdk.zip</DOpusSdkZip>
+    <DOpusSdkUrl>https://cdn2.gpsoft.com.au/files/Misc/opus_sdk.zip</DOpusSdkUrl>
+  </PropertyGroup>
+
+  <Target Name="InstallDOpusSdk" BeforeTargets="ClCompile">
+    <Message Importance="High" Text="Downloading DOpus SDK to $(DOpusSdkDir)" />
+
+    <MakeDir Directories="$(DOpusSdkDir)" Condition="!Exists('$(DOpusSdkDir)')" />
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(DOpusSdkZip)'))"
+             Condition="!Exists('$(DOpusSdkZip)')" />
+
+    <Exec Condition="!Exists('$(DOpusSdkZip)')"
+          Command='powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+            "Invoke-WebRequest -Uri &quot;$(DOpusSdkUrl)&quot; -OutFile &quot;$(DOpusSdkZip)&quot;"' />
+
+    <Exec Condition="!Exists('$(DOpusSdkDir)\headers')"
+          Command='powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+            "Expand-Archive -Path &quot;$(DOpusSdkZip)&quot; -DestinationPath &quot;$(DOpusSdkDir)&quot; -Force"' />
+  </Target>
+</Project>

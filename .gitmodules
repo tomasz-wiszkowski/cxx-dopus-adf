@@ -1,0 +1,3 @@
+[submodule "external/adflib"]
+	path = external/adflib
+	url = https://github.com/adflib/ADFlib.git

@@ -73,6 +73,7 @@ bool VFS_USBSafe(LPOPUSUSBSAFEDATA pUSBSafeData) {
 }
 
 HANDLE VFS_Create(LPGUID pGuid) {
+    adfLibInit();
     return (HANDLE)new cADFPluginData();
 }
 
@@ -81,12 +82,12 @@ void VFS_Destroy(HANDLE hData) {
 }
 
 bool VFS_ReadFile(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFile, LPVOID lpData, DWORD dwSize, LPDWORD lpdwReadSize) {
-    return (hData) ? ((cADFPluginData*)hData)->ReadFile((File*)hFile, dwSize, (std::uint8_t*) lpData, lpdwReadSize) : false;
+    return (hData) ? ((cADFPluginData*)hData)->ReadFile((AdfFile*)hFile, dwSize, (std::uint8_t*) lpData, lpdwReadSize) : false;
     
 }
 
 void VFS_CloseFile(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFile) {
-    ((cADFPluginData*)hData)->CloseFile((File*)hFile);
+    ((cADFPluginData*)hData)->CloseFile((AdfFile*)hFile);
 }
 
 HANDLE VFS_CreateFileW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, DWORD dwMode, DWORD dwFileAttr, DWORD dwFlags, LPFILETIME lpFT) {

@@ -1,14 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.3.11505.172
+VisualStudioVersion = 18.3.11505.172 d18.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "opusADF", "opusADF.vcxproj", "{A346D407-9B7E-4A50-ADC7-99A58442530C}"
-	ProjectSection(ProjectDependencies) = postProject
-		{82A8692D-BA15-386A-70B1-C83B3200B72B} = {82A8692D-BA15-386A-70B1-C83B3200B72B}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "adflib-vs", "external\adflib-vs.vcxproj", "{82A8692D-BA15-386A-70B1-C83B3200B72B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "adflib-vs", "adflib-vs.vcxproj", "{82A8692D-BA15-386A-70B1-C83B3200B72B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,14 +13,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Debug|x64.ActiveCfg = Debug|x64
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Debug|x64.Build.0 = Debug|x64
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Debug|x86.ActiveCfg = Debug|Win32
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Debug|x86.Build.0 = Debug|Win32
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Release|x64.ActiveCfg = Release|x64
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Release|x64.Build.0 = Release|x64
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Release|x86.ActiveCfg = Release|Win32
-		{A346D407-9B7E-4A50-ADC7-99A58442530C}.Release|x86.Build.0 = Release|Win32
 		{82A8692D-BA15-386A-70B1-C83B3200B72B}.Debug|x64.ActiveCfg = Debug|x64
 		{82A8692D-BA15-386A-70B1-C83B3200B72B}.Debug|x64.Build.0 = Debug|x64
 		{82A8692D-BA15-386A-70B1-C83B3200B72B}.Debug|x86.ActiveCfg = Debug|Win32
@@ -39,6 +26,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {79033D39-F7C0-45BC-8FFF-978DF26F4174}
+		SolutionGuid = {A61C83D5-35BC-47B2-BA96-6CBA40E3EAFD}
 	EndGlobalSection
 EndGlobal

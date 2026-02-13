@@ -277,4 +277,5 @@ __pycache__/
 # tools/**
 # !tools/packages.config
 
-external/
+external/dopus_sdk
+external/opus_sdk.zip

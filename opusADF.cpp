@@ -14,20 +14,69 @@ struct DateTime {
 
 DOpusPluginHelperFunction DOpus;
 
-std::wstring s2ws(const std::string& str) {
-    using convert_typeX = std::codecvt_utf8<wchar_t>;
-    std::wstring_convert<convert_typeX, wchar_t> converterX;
+/// @brief Convert a latin1 string to UTF-8
+/// @param latin1 Input string in latin1 encoding
+/// @return widestring in UTF-8 encoding
+std::wstring latin1_to_wstring(const std::string& latin1) {
+    int wide_len = MultiByteToWideChar(
+        28591, // ISO-8859-1 code page
+        /* flags= */0,
+        latin1.c_str(),
+        /* multibyte= */ -1,
+        nullptr,
+        0);
 
-    return converterX.from_bytes(str);
+    std::wstring wide(wide_len, 0);
+
+    MultiByteToWideChar(
+        28591,
+        0,
+        latin1.c_str(),
+        -1,
+        &wide[0],
+        wide_len);
+
+    // Truncate the null terminator added by MultiByteToWideChar
+    if (!wide.empty() && wide.back() == L'\0') {
+        wide.pop_back();
+    }
+    
+    return wide;
 }
 
-std::string ws2s(const std::wstring& wstr) {
-    using convert_typeX = std::codecvt_utf8<wchar_t>;
-    std::wstring_convert<convert_typeX, wchar_t> converterX;
+/// @brief Convert a wide string to latin1 encoding
+/// @param wide Input string in wide character encoding (UTF-16 on Windows)
+/// @return latin1 encoded string
+std::string wstring_to_latin1(const std::wstring& wide) {
+    int latin1_len = WideCharToMultiByte(
+        28591,  // ISO-8859-1 code page
+        WC_NO_BEST_FIT_CHARS,
+        wide.c_str(),
+        -1,
+        nullptr,
+        0,
+        "?",
+        nullptr);
 
-    return converterX.to_bytes(wstr);
+    std::string latin1(latin1_len, 0);
+
+    WideCharToMultiByte(
+        28591,
+        WC_NO_BEST_FIT_CHARS,
+        wide.c_str(),
+        -1,
+        &latin1[0],
+        latin1_len,
+        "?",
+        nullptr);
+
+    // Truncate the null terminator added by WideCharToMultiByte
+    if (!latin1.empty() && latin1.back() == '\0') {
+        latin1.pop_back();
+    }
+
+    return latin1;
 }
-
 
 bool adfIsLeap(int y) {
     return((bool)(!(y % 100) ? !(y % 400) : !(y % 4)));
@@ -154,7 +203,7 @@ LPVFSFILEDATAHEADER cADFPluginData::GetVFSforEntry(const AdfEntry *pEntry, HANDL
 }
 
 void cADFPluginData::GetWfdForEntry(const AdfEntry *pEntry, LPWIN32_FIND_DATA pData) {
-    auto filename = s2ws(pEntry->name);
+    auto filename = latin1_to_wstring(pEntry->name);
     StringCchCopyW(pData->cFileName, MAX_PATH, filename.c_str());
 
     pData->nFileSizeHigh = 0;
@@ -209,7 +258,7 @@ bool cADFPluginData::AdfChangeToPath(const std::wstring& pPath, bool pIgnoreLast
             if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
 
                 if (Depth.size()) {
-                    auto Filename = s2ws(entry->name);
+                    auto Filename = latin1_to_wstring(entry->name);
 
                     // Found our sub directory?
                     if (!Depth[0].compare(Filename)) {
@@ -268,7 +317,7 @@ bool cADFPluginData::LoadFile(const std::wstring& pAdfPath) {
 
     if (!mAdfDevice || !mAdfVolume) {
         // Find an open device for this disk image
-        auto Filepath = ws2s(AdfPath);
+        auto Filepath = wstring_to_latin1(AdfPath);
 
         mAdfDevice = std::move(std::shared_ptr<AdfDevice>(adfDevOpen(const_cast<CHAR*>(Filepath.c_str()), ADF_ACCESS_MODE_READONLY), maybeCallAdfDevUnMount));
         adfDevMount(mAdfDevice.get());
@@ -350,7 +399,7 @@ AdfFile* cADFPluginData::OpenFile(std::wstring pPath) {
 
         auto Paths = GetPaths(pPath);
 
-        auto Filename = ws2s(Paths[Paths.size() - 1]);
+        auto Filename = wstring_to_latin1(Paths[Paths.size() - 1]);
 
 		return adfFileOpen(mAdfVolume.get(), (char*)Filename.c_str(), ADF_FILE_MODE_READ);
     }
@@ -378,9 +427,9 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
 
         while (cell) {
             struct AdfEntry* entry = (AdfEntry*)cell->content;
-            auto Filepath = s2ws(entry->name);
+            auto Filepath = latin1_to_wstring(entry->name);
 
-            if (!Depth[Depth.size() - 1].compare(Filepath)) {
+            if (Depth[Depth.size() - 1] == Filepath) {
 
                 if (entry->type == ADF_ST_FILE)
                     return VFSCVRES_EXTRACT;
@@ -413,7 +462,7 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPat
             }
 
             struct AdfEntry* entry = (AdfEntry*)cell->content;
-            auto Filename = s2ws(entry->name);
+            auto Filename = latin1_to_wstring(entry->name);
 
             // Entry match?
             if (pAll || !Depth[Depth.size() - 1].compare(Filename)) {
@@ -424,7 +473,7 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPat
 
                 if (Filename[Filename.size() - 1] != '\\')
                     Filename += L"\\";
-                auto Filepath = s2ws(entry->name);
+                auto Filepath = latin1_to_wstring(entry->name);
                 Filename += Filepath;
 
                 if (entry->type == ADF_ST_FILE) {
@@ -458,7 +507,7 @@ cADFFindData* cADFPluginData::FindFirstFile(LPWSTR lpszPath, LPWIN32_FIND_DATA l
 
         auto depth = tokenize(lpszPath, L"\\\\");
         auto filemask = depth[depth.size() - 1];
-        auto Filepath = ws2s(filemask);
+        auto Filepath = wstring_to_latin1(filemask);
 
         findData->mFindMask = std::regex("(." + Filepath + ")");
 
@@ -600,7 +649,7 @@ int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, const std::wstring& 
 
     while (cell) {
         struct AdfEntry* entry = (AdfEntry*)cell->content;
-        auto Filename = s2ws(entry->name);
+        auto Filename = latin1_to_wstring(entry->name);
 
         if (!Depth[Depth.size() - 1].compare(Filename)) {
 
@@ -666,7 +715,7 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
             if (FinalName[FinalName.size() - 1] != '\\') {
                 FinalName += '\\';
             }
-            auto Filename = s2ws(entry->name);
+            auto Filename = latin1_to_wstring(entry->name);
             FinalName += Filename;
 
             // Entry match?
@@ -718,7 +767,7 @@ int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring&
             if (FinalPath[FinalPath.size() - 1] != '\\') {
                 FinalPath += '\\';
             }
-            auto Filepath = s2ws(entry->name);
+            auto Filepath = latin1_to_wstring(entry->name);
             FinalPath += Filepath;
 
             result |= Extract(lpBatchData, FinalPath, pDest);

@@ -49,4 +49,88 @@ endif()
 
 # Add subdirectories
 add_subdirectory(external/adflib)
-add_subdirectory(src)
+
+
+# Source files
+set(OPUSADF_SOURCES
+    dllmain.cpp
+    opusADF.cpp
+    stdafx.cpp
+)
+
+# Header files
+set(OPUSADF_HEADERS
+    opusADF.hpp
+    stdafx.h
+)
+
+# Create shared library (DLL)
+add_library(opusADF SHARED ${OPUSADF_SOURCES} ${OPUSADF_HEADERS})
+
+# Include directories
+target_include_directories(opusADF PRIVATE
+    ${CMAKE_SOURCE_DIR}/external/dopus_sdk/headers
+    ${CMAKE_SOURCE_DIR}/external/adflib/src
+)
+
+target_link_libraries(opusADF PRIVATE adf)
+
+set (CPP_DIRECTIVES OPUSADF_EXPORTS _WINDOWS _USRDLL _CRT_SECURE_NO_WARNINGS LITT_ENDIAN DOPUS_PLUGIN_HELPER UNICODE _UNICODE)
+if (IS_DEBUG)
+    list(APPEND CPP_DIRECTIVES _DEBUG)
+else()
+    list(APPEND CPP_DIRECTIVES NDEBUG)
+endif()
+
+if (PLATFORM_X64)
+    list(APPEND CPP_DIRECTIVES _WIN64)
+else()
+    list(APPEND CPP_DIRECTIVES WIN32)
+endif()
+
+target_compile_definitions(opusADF PRIVATE ${CPP_DIRECTIVES})
+
+# Compiler flags
+if(MSVC)
+    target_compile_options(opusADF PRIVATE
+        /W3      # Warning level 3
+        $<$<CONFIG:Debug>:/Od>   # Disable optimization for Debug
+        $<$<CONFIG:Release>:/O1> # Optimize for size
+        $<$<CONFIG:Release>:/Oy> # Omit frame pointers
+    )
+
+    # Conformance mode
+    target_compile_options(opusADF PRIVATE /permissive-)
+
+    # SDL checks
+    target_compile_options(opusADF PRIVATE /sdl)
+else()
+    # GCC/Clang flags
+    target_compile_options(opusADF PRIVATE
+        -Wall
+        $<$<CONFIG:Debug>:-O0 -g>
+        $<$<CONFIG:Release>:-Os -fomit-frame-pointer>
+    )
+endif()
+
+# Linker flags
+if(MSVC)
+    set_target_properties(opusADF PROPERTIES
+        LINK_FLAGS_DEBUG "/DEBUG /INCREMENTAL"
+        LINK_FLAGS_RELEASE "/DEBUG /INCREMENTAL:NO /OPT:REF /OPT:ICF"
+    )
+
+    # Set subsystem to Windows
+    target_link_options(opusADF PRIVATE /SUBSYSTEM:WINDOWS)
+endif()
+
+# Set output name
+set_target_properties(opusADF PROPERTIES
+    OUTPUT_NAME "opusADF"
+    PREFIX ""
+)
+
+set_target_properties(opusADF PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin/Debug"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin/Release"
+)

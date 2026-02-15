@@ -24,6 +24,39 @@
 			"group": "build",
 			"problemMatcher": [],
 			"detail": "CMake template build task"
+		},
+		{
+			"label": "Deploy and Run (Debug)",
+			"type": "shell",
+			"command": "taskkill /F /IM dopus.exe 2>$null; Copy-Item -Path \\\"${workspaceFolder}/bin/Debug/opusADF.dll\\\" -Destination \\\"C:/Program Files/GPSoftware/Directory Opus/VFSPlugins/opusADF.dll\\\" -Force; Start-Process \\\"C:/Program Files/GPSoftware/Directory Opus/dopus.exe\\\"",
+			"options": {
+				"shell": {
+					"executable": "powershell.exe",
+					"args": ["-Command"]
+				}
+			},
+			"dependsOn": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"detail": "Kill dopus.exe, copy debug DLL to VFSPlugins, and restart"
+		},
+		{
+			"label": "Deploy and Run (Release)",
+			"type": "shell",
+			"command": "taskkill /F /IM dopus.exe 2>$null; Copy-Item -Path \\\"${workspaceFolder}/bin/Release/opusADF.dll\\\" -Destination \\\"C:/Program Files/GPSoftware/Directory Opus/VFSPlugins/opusADF.dll\\\" -Force; Start-Process \\\"C:/Program Files/GPSoftware/Directory Opus/dopus.exe\\\"",
+			"options": {
+				"shell": {
+					"executable": "powershell.exe",
+					"args": ["-Command"]
+				}
+			},
+			"dependsOn": [],
+			"group": "test",
+			"problemMatcher": [],
+			"detail": "Kill dopus.exe, copy release DLL to VFSPlugins, and restart"
 		}
 	]
 }

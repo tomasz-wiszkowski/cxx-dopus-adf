@@ -1,102 +1,102 @@
 {
-  "version": 3,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 15,
-    "patch": 0
-  },
-  "configurePresets": [
-    {
-      "name": "windows-base",
-      "hidden": true,
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": {
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 15,
+        "patch": 0
     },
-    {
-      "name": "windows-x64-debug",
-      "displayName": "Windows x64 Debug",
-      "description": "Debug build for x64 Windows",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "x64",
-        "strategy": "set"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "windows-x64-release",
-      "displayName": "Windows x64 Release",
-      "description": "Release build for x64 Windows",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "x64",
-        "strategy": "set"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    },
-    {
-      "name": "windows-x86-debug",
-      "displayName": "Windows x86 Debug",
-      "description": "Debug build for x86 Windows",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "Win32",
-        "strategy": "set"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "windows-x86-release",
-      "displayName": "Windows x86 Release",
-      "description": "Release build for x86 Windows",
-      "inherits": "windows-base",
-      "architecture": {
-        "value": "Win32",
-        "strategy": "set"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    }
-  ],
-  "buildPresets": [
-    {
-      "name": "windows-x64-debug",
-      "displayName": "Windows x64 Debug",
-      "configurePreset": "windows-x64-debug",
-      "configuration": "Debug"
-    },
-    {
-      "name": "windows-x64-release",
-      "displayName": "Windows x64 Release",
-      "configurePreset": "windows-x64-release",
-      "configuration": "Release"
-    },
-    {
-      "name": "windows-x86-debug",
-      "displayName": "Windows x86 Debug",
-      "configurePreset": "windows-x86-debug",
-      "configuration": "Debug"
-    },
-    {
-      "name": "windows-x86-release",
-      "displayName": "Windows x86 Release",
-      "configurePreset": "windows-x86-release",
-      "configuration": "Release"
-    }
-  ]
+    "configurePresets": [
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "generator": "Visual Studio 18 2026",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "windows-x64-debug",
+            "displayName": "Windows x64 Debug",
+            "description": "Debug build for x64 Windows",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-x64-release",
+            "displayName": "Windows x64 Release",
+            "description": "Release build for x64 Windows",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "windows-x86-debug",
+            "displayName": "Windows x86 Debug",
+            "description": "Debug build for x86 Windows",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "Win32",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-x86-release",
+            "displayName": "Windows x86 Release",
+            "description": "Release build for x86 Windows",
+            "inherits": "windows-base",
+            "architecture": {
+                "value": "Win32",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-x64-debug",
+            "displayName": "Windows x64 Debug",
+            "configurePreset": "windows-x64-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-x64-release",
+            "displayName": "Windows x64 Release",
+            "configurePreset": "windows-x64-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-x86-debug",
+            "displayName": "Windows x86 Debug",
+            "configurePreset": "windows-x86-debug",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-x86-release",
+            "displayName": "Windows x86 Release",
+            "configurePreset": "windows-x86-release",
+            "configuration": "Release"
+        }
+    ]
 }

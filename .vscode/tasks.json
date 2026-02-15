@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cmake",
+			"label": "CMake: build release",
+			"command": "build",
+			"targets": [
+				"all"
+			],
+			"preset": "windows-x64-release",
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "CMake template build task"
+		},
+		{
+			"type": "cmake",
+			"label": "CMake: build debug",
+			"command": "build",
+			"targets": [
+				"all"
+			],
+			"preset": "windows-x64-debug",
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "CMake template build task"
+		}
+	]
+}

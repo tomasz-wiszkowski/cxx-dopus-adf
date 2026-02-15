@@ -145,6 +145,8 @@
       <PreprocessorDefinitions>NDEBUG;OPUSADF_EXPORTS;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;LITT_ENDIAN;DOPUS_PLUGIN_HELPER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>external\dopus_sdk\headers;external\adflib\src</AdditionalIncludeDirectories>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

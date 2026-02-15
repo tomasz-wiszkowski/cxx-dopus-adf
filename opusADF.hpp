@@ -54,7 +54,7 @@ public:
 
     int Delete(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPath, const std::wstring& pFile, bool pAll = false);
 
-    cADFFindData *FindFirstFile(LPTSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
+    cADFFindData *FindFirstFile(LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
     bool FindNextFile(cADFFindData* lpRAF, LPWIN32_FIND_DATA lpwfdData);
     void FindClose(cADFFindData* lpRAF);
 
@@ -67,7 +67,7 @@ public:
     int ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPath, const std::wstring& pDest);
 
     int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
-    UINT BatchOperation(LPTSTR lpszPath, LPVFSBATCHDATAW lpBatchData);
+    UINT BatchOperation(LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData);
     bool PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
 
 };

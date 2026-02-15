@@ -450,7 +450,7 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPat
     return 0;
 }
 
-cADFFindData* cADFPluginData::FindFirstFile(LPTSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent) {
+cADFFindData* cADFPluginData::FindFirstFile(LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent) {
 
     cADFFindData* findData = new cADFFindData();
 
@@ -771,12 +771,13 @@ size_t cADFPluginData::TotalDiskBlocks(const std::wstring& pFile) {
     return (size_t)mAdfDevice->sizeBlocks;
 }
 
-UINT cADFPluginData::BatchOperation(LPTSTR lpszPath, LPVFSBATCHDATAW lpBatchData) {
+UINT cADFPluginData::BatchOperation(LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData) {
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETPERCENT, (DWORD_PTR)0);
-    
+
     auto result = VFSBATCHRES_COMPLETE;
 
     auto file = lpBatchData->pszFiles;
+    std::wstring pathStr(lpszPath);
 
     for (int i = 0; i < lpBatchData->iNumFiles; ++i) {
 
@@ -785,11 +786,11 @@ UINT cADFPluginData::BatchOperation(LPTSTR lpszPath, LPVFSBATCHDATAW lpBatchData
         }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_ADD) {
-            lpBatchData->piResults[i] = Import(lpBatchData, lpszPath, file);
+            lpBatchData->piResults[i] = Import(lpBatchData, pathStr, file);
         }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_DELETE) {
-            lpBatchData->piResults[i] = Delete(lpBatchData, lpszPath, file);
+            lpBatchData->piResults[i] = Delete(lpBatchData, pathStr, file);
         }
 
         if (lpBatchData->piResults[i]) {

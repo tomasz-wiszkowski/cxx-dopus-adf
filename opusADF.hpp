@@ -32,16 +32,14 @@ protected:
     FILETIME            GetFileTime(const AdfEntry *pEntry);
     void                SetEntryTime(AdfFile *pFile, FILETIME pFT);
 
-    bool LoadFile(const std::wstring& pAfPath);
+    bool LoadFile(std::wstring_view pAfPath);
     spList GetCurrentDirectoryList();
 
 public:
     cADFPluginData();
     ~cADFPluginData();
 
-    std::vector<std::wstring> GetPaths(std::wstring pPath);
-
-    bool AdfChangeToPath(const std::wstring& pPath, bool pIgnoreLast = false);
+    bool AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast = false);
 
     bool ReadDirectory(LPVFSREADDIRDATAW lpRDD);
     bool ReadFile(AdfFile* pFile, size_t pBytes, std::uint8_t* pBuffer, LPDWORD pReadSize );
@@ -58,9 +56,9 @@ public:
     bool FindNextFile(cADFFindData* lpRAF, LPWIN32_FIND_DATA lpwfdData);
     void FindClose(cADFFindData* lpRAF);
 
-    int Import(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFile, const std::wstring& pPath);
-    int ImportFile(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFile, const std::wstring& pPath);
-    int ImportPath(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFile, const std::wstring& pPath);
+    int Import(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath);
+    int ImportFile(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath);
+    int ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath);
 
     int Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFile, const std::wstring& pDest);
     int ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEntry, const std::wstring& pDest);

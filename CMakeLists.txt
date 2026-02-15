@@ -56,12 +56,14 @@ set(OPUSADF_SOURCES
     dllmain.cpp
     opusADF.cpp
     stdafx.cpp
+    text_utils.cc
 )
 
 # Header files
 set(OPUSADF_HEADERS
     opusADF.hpp
     stdafx.h
+    text_utils.hh
 )
 
 # Create shared library (DLL)

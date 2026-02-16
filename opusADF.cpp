@@ -141,62 +141,32 @@ void cADFPluginData::GetWfdForEntry(const AdfEntry *pEntry, LPWIN32_FIND_DATA pD
 }
 
 bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) {
-    bool result = false;
-
-    if (!LoadFile(pPath))
-        return false;
-
-    auto components = split_path_to_components(pPath, mPath);
-
-    if (pIgnoreLast) {
-        if (components.size() > 0)
-            components.pop_back();
-    }
-
+    if (!LoadFile(pPath)) return false;
     if (!mAdfVolume) return false;
 
     adfToRootDir(mAdfVolume.get());
 
-    auto head = GetCurrentDirectoryList();
-    AdfList *cell = head.get();
-    while (cell) {
-        struct AdfEntry* entry = (AdfEntry*)cell->content;
+    auto components = split_path_to_components(pPath, mPath);
+    if (components.empty()) return !pIgnoreLast; // Root directory cannot ignore last component.
+    if (pIgnoreLast) components.pop_back();
 
-        if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
+    for (auto& component : components) {
+        auto adf_component = wstring_to_latin1(component);
+        auto directory = GetCurrentDirectoryList2();
 
-            if (components.size()) {
-                auto Filename = latin1_to_wstring(entry->name);
-
-                // Found our sub directory?
-                if (components[0] == Filename) {
-
-                    // Free current cell, and load the next
-                    if (entry->type == ADF_ST_DIR || entry->type == ADF_ST_LDIR || components.size() > 1) {
-                        adfChangeDir(mAdfVolume.get(), entry->name);
-
-                        head = GetCurrentDirectoryList();
-                        cell = head.get();
-                    }
-
-                    components.erase(components.begin());
-
-                    // Empty folder?
-                    if (!cell || !components.size())
-                        return true;
-
-                    continue;
-                }
+        auto entry = std::ranges::find_if(directory, [&adf_component](const AdfEntry& entry) {
+            if (entry.type == ADF_ST_LFILE || entry.type == ADF_ST_LDIR || entry.type == ADF_ST_LSOFT) {
+                return false;
             }
-            else {
-                result = true;
-                break;
-            }
-        }
+            return adf_component == entry.name;
+        });
 
-        cell = cell->next;
+        // No matching entry found for this component, path is invalid.
+        if (entry == directory.end()) return false;
+        adfChangeDir(mAdfVolume.get(), entry->name);
     }
 
-    return result;
+    return true;
 }
 
 static void maybeCallAdfDevUnMount(AdfDevice* device) {
@@ -265,9 +235,9 @@ bool cADFPluginData::ReadDirectory(LPVFSREADDIRDATAW lpRDD) {
     auto directory = GetCurrentDirectoryList2();
 
     LPVFSFILEDATAHEADER lpLastHeader = 0;
-    for (AdfEntry* entry : directory) {
-        if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
-            LPVFSFILEDATAHEADER lpFDH = GetVFSforEntry(entry, lpRDD->hMemHeap);
+    for (const AdfEntry& entry : directory) {
+        if (!(entry.type == ADF_ST_LFILE || entry.type == ADF_ST_LDIR || entry.type == ADF_ST_LSOFT)) {
+            LPVFSFILEDATAHEADER lpFDH = GetVFSforEntry(&entry, lpRDD->hMemHeap);
 
             // Add the entries for this folder
             if (lpFDH) {
@@ -319,11 +289,11 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
     auto want_file_name = wstring_to_latin1(file_from_path(lpVerbData->lpszPath));
     auto directory = GetCurrentDirectoryList2();
 
-    for (AdfEntry* entry : directory) {
-        if (want_file_name != entry->name) continue;
+    for (const AdfEntry& entry : directory) {
+        if (want_file_name != entry.name) continue;
 
-        if (entry->type == ADF_ST_FILE) return VFSCVRES_EXTRACT;
-        if (entry->type == ADF_ST_DIR) return VFSCVRES_DEFAULT;
+        if (entry.type == ADF_ST_FILE) return VFSCVRES_EXTRACT;
+        if (entry.type == ADF_ST_DIR) return VFSCVRES_DEFAULT;
     }
 
     return VFSCVRES_FAIL;
@@ -338,17 +308,17 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, 
     if (!AdfChangeToPath(path)) return 0;
 
     auto directory = GetCurrentDirectoryList2();
-    for (AdfEntry* entry : directory) {
+    for (const AdfEntry& entry : directory) {
         // TODO: magic numbers
         if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) return 1;
 
         // Entry match?
-        if (pAll || adf_file_name == entry->name) {
+        if (pAll || adf_file_name == entry.name) {
             {
                 // Convert filename to show in progress bar
-                auto filename = latin1_to_wstring(entry->name);
+                auto filename = latin1_to_wstring(entry.name);
                 DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.data());
-                DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry->size);
+                DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry.size);
             }
 
             // TODO: perhaps can avoid creating strings here. Not sure why that is needed.
@@ -356,21 +326,21 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, 
 
             if (Filename[Filename.size() - 1] != '\\')
                 Filename += L"\\";
-            auto Filepath = latin1_to_wstring(entry->name);
+            auto Filepath = latin1_to_wstring(entry.name);
             Filename += Filepath;
 
-            if (entry->type == ADF_ST_FILE)
+            if (entry.type == ADF_ST_FILE)
             {
-                result |= adfRemoveEntry(mAdfVolume.get(), entry->parent, entry->name);
+                result |= adfRemoveEntry(mAdfVolume.get(), entry.parent, entry.name);
                 if (!result)
                     DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_REMDIR, Filename.c_str());
             }
 
-            if (entry->type == ADF_ST_DIR)
+            if (entry.type == ADF_ST_DIR)
             {
 
                 Delete(lpBatchData, Filename, Filepath, true);
-                result |= adfRemoveEntry(mAdfVolume.get(), entry->parent, entry->name);
+                result |= adfRemoveEntry(mAdfVolume.get(), entry.parent, entry.name);
                 AdfChangeToPath(path);
                 if (!result)
                     DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_REMDIR, Filename.c_str());
@@ -526,8 +496,8 @@ int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
     DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_MAKEDIR, Final.c_str());
 
     auto directory = GetCurrentDirectoryList2();
-    for (AdfEntry* entry : directory) {
-        if (adf_file_name != entry->name) continue;
+    for (const AdfEntry& entry : directory) {
+        if (adf_file_name != entry.name) continue;
 
         auto contents = directoryList(FinalPath + L"*.*");
 
@@ -578,7 +548,7 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
     auto want_file_name = file_from_path(pFile);
 
     auto directory = GetCurrentDirectoryList2();
-    for (AdfEntry* entry : directory) {
+    for (const AdfEntry& entry : directory) {
         if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) {
             return 1;
         }
@@ -587,30 +557,30 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
         if (FinalName[FinalName.size() - 1] != '\\') {
             FinalName += '\\';
         }
-        auto Filename = latin1_to_wstring(entry->name);
+        auto Filename = latin1_to_wstring(entry.name);
         FinalName += Filename;
 
         // Entry match?
         if (Filename == want_file_name) {
 
-            DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)entry->name);
-            DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry->size);
+            DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)entry.name);
+            DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry.size);
 
             // Create a directory, or extract a file?
-            if (entry->type == ADF_ST_DIR) {
+            if (entry.type == ADF_ST_DIR) {
                 CreateDirectory(FinalName.c_str(), 0);
                 result = ExtractPath(lpBatchData, pFile, FinalName);
                 DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, false, OPUSFILECHANGE_CREATE, lpBatchData->pszDestPath);
 
                 if (!result) {
                     HANDLE filename = CreateFile(FinalName.c_str(), FILE_WRITE_ATTRIBUTES, 0, 0, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-                    auto entryTime = GetFileTime(entry);
+                    auto entryTime = GetFileTime(&entry);
                     SetFileTime(filename, 0, 0, &entryTime);
                     CloseHandle(filename);
                 }
             }
             else {
-                result = ExtractFile(lpBatchData, entry, FinalName);
+                result = ExtractFile(lpBatchData, &entry, FinalName);
             }
 
             DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_NEXTFILE, 0);
@@ -627,13 +597,13 @@ int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring&
     if (!AdfChangeToPath(pPath)) return result;
 
     auto directory = GetCurrentDirectoryList2();
-    for (AdfEntry* entry : directory) {
+    for (const AdfEntry& entry : directory) {
         std::wstring FinalPath = pPath;
         if (FinalPath[FinalPath.size() - 1] != '\\')
         {
             FinalPath += '\\';
         }
-        auto Filepath = latin1_to_wstring(entry->name);
+        auto Filepath = latin1_to_wstring(entry.name);
         FinalPath += Filepath;
 
         result |= Extract(lpBatchData, FinalPath, pDest);

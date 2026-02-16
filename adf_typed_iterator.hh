@@ -7,14 +7,18 @@ template <typename T>
 class AdfTypedIterator {
 public:
     using iterator_category = std::forward_iterator_tag;
-    using value_type = T*;
+    using value_type = T;
     using difference_type = std::ptrdiff_t;
-    using pointer = T**;
-    using reference = T*&;
+    using pointer = T*;
+    using reference = T&;
 
     explicit AdfTypedIterator(AdfList* node = nullptr) : current_(node) {}
 
-    T* operator*() const {
+    T& operator*() const {
+        return *static_cast<T*>(current_->content);
+    }
+
+    T* operator->() const {
         return static_cast<T*>(current_->content);
     }
 

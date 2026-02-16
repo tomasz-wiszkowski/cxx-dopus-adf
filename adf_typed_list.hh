@@ -11,6 +11,18 @@ public:
 
     explicit AdfTypedList(AdfList* list, void(*deleter)(AdfList*)) : list_(list), deleter_(deleter) {}
 
+    explicit AdfTypedList(AdfTypedList&& other) noexcept {
+        *this = std::move(other);
+    }
+
+    AdfTypedList<T>& operator =(AdfTypedList&& other) noexcept {
+        if (this != &other) {
+            std::swap(list_, other.list_);
+            std::swap(deleter_, other.deleter_);
+        }
+        return *this;
+    }
+
     ~AdfTypedList() {
         if (list_) (*deleter_)(list_);
     }
@@ -25,6 +37,6 @@ public:
     }
 
 private:
-    AdfList* list_;
-    void(*deleter_)(AdfList*);
+    AdfList* list_{};
+    void(*deleter_)(AdfList*){};
 };

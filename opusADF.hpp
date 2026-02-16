@@ -11,10 +11,11 @@ typedef std::weak_ptr<AdfDevice>   wpDevice;
 typedef std::weak_ptr<AdfVolume>   wpVolume;
 
 class cADFFindData {
-
 public:
-    spList mHead;
-    AdfList*  mCell;
+    cADFFindData(AdfTypedList<AdfEntry>&& directory) : mDirectoryList(std::move(directory)), mCurrentEntry(mDirectoryList.begin()) {}
+
+    AdfTypedList<AdfEntry> mDirectoryList;
+    AdfTypedIterator<AdfEntry> mCurrentEntry;
     std::regex mFindMask;
 };
 
@@ -30,9 +31,9 @@ class cADFPluginData {
 protected:
 
     LPVFSFILEDATAHEADER GetVFSforEntry(const AdfEntry *pEntry, HANDLE pHeap);
-    void GetWfdForEntry(const AdfEntry *pEntry, LPWIN32_FIND_DATA pData);
+    void GetWfdForEntry(const AdfEntry &entry, LPWIN32_FIND_DATA pData);
 
-    FILETIME            GetFileTime(const AdfEntry *pEntry);
+    FILETIME            GetFileTime(const AdfEntry &entry);
     void                SetEntryTime(AdfFile *pFile, FILETIME pFT);
 
     bool LoadFile(std::wstring_view pAfPath);

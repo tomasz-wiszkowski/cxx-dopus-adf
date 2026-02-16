@@ -61,16 +61,16 @@ cADFPluginData::~cADFPluginData() {
 
 }
 
-FILETIME cADFPluginData::GetFileTime(const AdfEntry *pEntry) {
+FILETIME cADFPluginData::GetFileTime(const AdfEntry &entry) {
     SYSTEMTIME AmigaTime, TZAdjusted;
     AmigaTime.wDayOfWeek = 0;
     AmigaTime.wMilliseconds = 0;
-    AmigaTime.wYear = pEntry->year;
-    AmigaTime.wMonth = pEntry->month;
-    AmigaTime.wDay = pEntry->days;
-    AmigaTime.wHour = pEntry->hour;
-    AmigaTime.wMinute = pEntry->mins;
-    AmigaTime.wSecond = pEntry->secs;
+    AmigaTime.wYear = entry.year;
+    AmigaTime.wMonth = entry.month;
+    AmigaTime.wDay = entry.days;
+    AmigaTime.wHour = entry.hour;
+    AmigaTime.wMinute = entry.mins;
+    AmigaTime.wSecond = entry.secs;
     TzSpecificLocalTimeToSystemTime(nullptr, &AmigaTime, &TZAdjusted);
     FILETIME ft;
     SystemTimeToFileTime(&TZAdjusted, &ft);
@@ -113,20 +113,20 @@ LPVFSFILEDATAHEADER cADFPluginData::GetVFSforEntry(const AdfEntry *pEntry, HANDL
         lpFD->iNumColumns = 0;
         lpFD->lpvfsColumnData = 0;
 
-        GetWfdForEntry(pEntry, &lpFD->wfdData);
+        GetWfdForEntry(*pEntry, &lpFD->wfdData);
     }
 
     return lpFDH;
 }
 
-void cADFPluginData::GetWfdForEntry(const AdfEntry *pEntry, LPWIN32_FIND_DATA pData) {
-    auto filename = latin1_to_wstring(pEntry->name);
+void cADFPluginData::GetWfdForEntry(const AdfEntry &entry, LPWIN32_FIND_DATA pData) {
+    auto filename = latin1_to_wstring(entry.name);
     StringCchCopyW(pData->cFileName, MAX_PATH, filename.c_str());
 
     pData->nFileSizeHigh = 0;
-    pData->nFileSizeLow = pEntry->size;
+    pData->nFileSizeLow = entry.size;
 
-    if (pEntry->type == ADF_ST_DIR)
+    if (entry.type == ADF_ST_DIR)
         pData->dwFileAttributes = FILE_ATTRIBUTE_DIRECTORY;
     else
         pData->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
@@ -136,7 +136,7 @@ void cADFPluginData::GetWfdForEntry(const AdfEntry *pEntry, LPWIN32_FIND_DATA pD
 
     pData->ftCreationTime = {};
     pData->ftLastAccessTime = {};
-    pData->ftLastWriteTime = GetFileTime(pEntry);
+    pData->ftLastWriteTime = GetFileTime(entry);
 }
 
 bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) {
@@ -360,53 +360,32 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, 
 cADFFindData* cADFPluginData::FindFirstFile(LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent) {
     if (!AdfChangeToPath(lpszPath, true)) return nullptr;
 
-    cADFFindData* findData = new cADFFindData();
+    // TODO: this is incorrect. This tries to operate on Latin1 characters, but should instead operate on the wide strings.
     auto Filepath = wstring_to_latin1(file_from_path(lpszPath));
+    auto find_data = std::make_unique<cADFFindData>(GetCurrentDirectoryList2());
+    find_data->mFindMask = std::regex("(." + Filepath + ")");
 
-    findData->mFindMask = std::regex("(." + Filepath + ")");
+    if (!FindNextFile(find_data.get(), lpwfdData)) find_data.reset();
 
-    findData->mHead = GetCurrentDirectoryList();
-    findData->mCell = findData->mHead.get();
-
-    while (findData->mCell) {
-        struct AdfEntry* entry = (AdfEntry*)findData->mCell->content;
-
-        if (std::regex_match(entry->name, findData->mFindMask)) {
-
-            if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
-
-                GetWfdForEntry(entry, lpwfdData);
-                findData->mCell = findData->mCell->next;
-                break;
-            }
-        }
-
-        findData->mCell = findData->mCell->next;
-    }
-
-    return findData;
+    return find_data.release();
 }
 
 bool cADFPluginData::FindNextFile(cADFFindData* pFindData, LPWIN32_FIND_DATA lpwfdData) {
+    const auto& directory = pFindData->mDirectoryList;
+    auto& iter = pFindData->mCurrentEntry;
+    const auto& pattern = pFindData->mFindMask;
 
-    while (pFindData->mCell) {
-        struct AdfEntry* entry = (AdfEntry*)pFindData->mCell->content;
-
-        if (std::regex_match(entry->name, pFindData->mFindMask)) {
-
-            if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
-
-                GetWfdForEntry(entry, lpwfdData);
-
-                pFindData->mCell = pFindData->mCell->next;
-                return true;
-            }
-        }
-
-        pFindData->mCell = pFindData->mCell->next;
+    for (; iter != directory.end(); ++iter) {
+        // TODO: this is incorrect. This tries to operate on Latin1 characters, but should instead operate on the wide strings.
+        if (!std::regex_match(iter->name, pattern)) continue;
+        if (iter->type == ADF_ST_LFILE || iter->type == ADF_ST_LDIR || iter->type == ADF_ST_LSOFT) continue;
+        break;
     }
 
-    return false;
+    if (iter == directory.end()) return false;
+    GetWfdForEntry(*iter, lpwfdData);
+    ++iter;
+    return true;
 }
 
 void cADFPluginData::FindClose(cADFFindData* pFindData) {
@@ -580,7 +559,7 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
 
                 if (!result) {
                     HANDLE filename = CreateFile(FinalName.c_str(), FILE_WRITE_ATTRIBUTES, 0, 0, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-                    auto entryTime = GetFileTime(&entry);
+                    auto entryTime = GetFileTime(entry);
                     SetFileTime(filename, 0, 0, &entryTime);
                     CloseHandle(filename);
                 }
@@ -635,7 +614,7 @@ int cADFPluginData::ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEn
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STEPBYTES, (DWORD_PTR)pEntry->size);
 
     HANDLE filename = CreateFile(pDest.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-	auto entryTime = GetFileTime(pEntry);
+	auto entryTime = GetFileTime(*pEntry);
     SetFileTime(filename, 0, 0, &entryTime);
     CloseHandle(filename);
 

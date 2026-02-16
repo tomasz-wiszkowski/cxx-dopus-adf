@@ -44,5 +44,5 @@ public:
     }
 
 private:
-    AdfList* current_;
+    AdfList* current_{};
 };

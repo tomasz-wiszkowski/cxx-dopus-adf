@@ -3,6 +3,16 @@
 #include <filesystem>
 #include "adf_typed_list.hh"
 
+namespace adf {
+struct AdfDeviceDeleter {
+    void operator()(AdfDevice *device) const;
+};
+
+struct AdfVolumeDeleter {
+    void operator()(AdfVolume *volume) const;
+};
+}  // namespace internal
+
 class cADFFindData {
 public:
     cADFFindData(AdfTypedList<AdfEntry>&& directory) : mDirectoryList(std::move(directory)), mCurrentEntry(mDirectoryList.begin()) {}
@@ -13,15 +23,14 @@ public:
 };
 
 class cADFPluginData {
-    HINSTANCE				mAdfDll;
-    size_t                  mLastError;
+    HINSTANCE				mAdfDll{};
+    size_t                  mLastError{};
     std::filesystem::path   mPath;
 
-    std::unique_ptr<AdfDevice, void(*)(AdfDevice*)> mAdfDevice;
-    std::unique_ptr<AdfVolume, void(*)(AdfVolume*)> mAdfVolume;
+    std::unique_ptr<AdfDevice, adf::AdfDeviceDeleter> mAdfDevice;
+    std::unique_ptr<AdfVolume, adf::AdfVolumeDeleter> mAdfVolume;
 
 protected:
-
     LPVFSFILEDATAHEADER GetVFSforEntry(const AdfEntry *pEntry, HANDLE pHeap);
     void GetWfdForEntry(const AdfEntry &entry, LPWIN32_FIND_DATA pData);
 
@@ -32,9 +41,6 @@ protected:
     AdfTypedList<AdfEntry> GetCurrentDirectoryList();
 
 public:
-    cADFPluginData();
-    ~cADFPluginData();
-
     bool AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast = false);
 
     bool ReadDirectory(LPVFSREADDIRDATAW lpRDD);

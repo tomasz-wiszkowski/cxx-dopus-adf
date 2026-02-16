@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <strsafe.h>
+#include <cwctype>
 
 #include "stdafx.h"
 #include "text_utils.hh"
@@ -52,25 +53,16 @@ void adfTime2AmigaTime(struct DateTime dt, int32_t *day, int32_t *min, int32_t *
     }
 }
 
-cADFPluginData::cADFPluginData() {
-    mAdfDevice = 0;
-    mAdfVolume = 0;
-}
-
-cADFPluginData::~cADFPluginData() {
-
-}
-
 FILETIME cADFPluginData::GetFileTime(const AdfEntry &entry) {
     SYSTEMTIME AmigaTime, TZAdjusted;
     AmigaTime.wDayOfWeek = 0;
     AmigaTime.wMilliseconds = 0;
-    AmigaTime.wYear = entry.year;
-    AmigaTime.wMonth = entry.month;
-    AmigaTime.wDay = entry.days;
-    AmigaTime.wHour = entry.hour;
-    AmigaTime.wMinute = entry.mins;
-    AmigaTime.wSecond = entry.secs;
+    AmigaTime.wYear = static_cast<WORD>(entry.year);
+    AmigaTime.wMonth = static_cast<WORD>(entry.month);
+    AmigaTime.wDay = static_cast<WORD>(entry.days);
+    AmigaTime.wHour = static_cast<WORD>(entry.hour);
+    AmigaTime.wMinute = static_cast<WORD>(entry.mins);
+    AmigaTime.wSecond = static_cast<WORD>(entry.secs);
     TzSpecificLocalTimeToSystemTime(nullptr, &AmigaTime, &TZAdjusted);
     FILETIME ft;
     SystemTimeToFileTime(&TZAdjusted, &ft);
@@ -100,21 +92,22 @@ void cADFPluginData::SetEntryTime(AdfFile *pFile, FILETIME pFT) {
 LPVFSFILEDATAHEADER cADFPluginData::GetVFSforEntry(const AdfEntry *pEntry, HANDLE pHeap) {
     LPVFSFILEDATAHEADER lpFDH;
 
-    if (lpFDH = (LPVFSFILEDATAHEADER)HeapAlloc(pHeap, 0, sizeof(VFSFILEDATAHEADER) + sizeof(VFSFILEDATA))) {
-        LPVFSFILEDATA lpFD = (LPVFSFILEDATA)(lpFDH + 1);
+    lpFDH = (LPVFSFILEDATAHEADER)HeapAlloc(pHeap, 0, sizeof(VFSFILEDATAHEADER) + sizeof(VFSFILEDATA));
+    if (!lpFDH) return nullptr;
 
-        lpFDH->cbSize = sizeof(VFSFILEDATAHEADER);
-        lpFDH->lpNext = 0;
-        lpFDH->iNumItems = 1;
-        lpFDH->cbFileDataSize = sizeof(VFSFILEDATA);
+    LPVFSFILEDATA lpFD = (LPVFSFILEDATA)(lpFDH + 1);
 
-        lpFD->dwFlags = 0;
-        lpFD->lpszComment = 0;
-        lpFD->iNumColumns = 0;
-        lpFD->lpvfsColumnData = 0;
+    lpFDH->cbSize = sizeof(VFSFILEDATAHEADER);
+    lpFDH->lpNext = 0;
+    lpFDH->iNumItems = 1;
+    lpFDH->cbFileDataSize = sizeof(VFSFILEDATA);
 
-        GetWfdForEntry(*pEntry, &lpFD->wfdData);
-    }
+    lpFD->dwFlags = 0;
+    lpFD->lpszComment = 0;
+    lpFD->iNumColumns = 0;
+    lpFD->lpvfsColumnData = 0;
+
+    GetWfdForEntry(*pEntry, &lpFD->wfdData);
 
     return lpFDH;
 }
@@ -168,14 +161,17 @@ bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) 
     return true;
 }
 
-static void maybeCallAdfDevUnMount(AdfDevice* device) {
+namespace adf {
+void AdfDeviceDeleter::operator()(AdfDevice* device) const {
     if (!device) return;
     adfDevUnMount(device);
     adfDevClose(device);
 }
 
-static void maybeCallAdfVolUnMount(AdfVolume* volume) {
-    if (volume) adfVolUnMount(volume);
+void AdfVolumeDeleter::operator()(AdfVolume* volume) const {
+    if (!volume) return;
+    adfVolUnMount(volume);
+}
 }
 
 // TODO: migrate all to std::filesystem::path.
@@ -187,6 +183,8 @@ bool cADFPluginData::LoadFile(std::wstring_view pAdfPath) {
 
     // Loading new file. Should we cache this?
     mPath.clear();
+    mAdfVolume.reset();
+    mAdfDevice.reset();
 
     // Walk the pAdfPath up until we find the valid file.
     std::filesystem::path real_file_path = pAdfPath;
@@ -198,27 +196,28 @@ bool cADFPluginData::LoadFile(std::wstring_view pAdfPath) {
 
     // Get extension and check if it's supported.
     auto extension = real_file_path.extension().wstring();
-    std::ranges::transform(extension, extension.begin(), ::tolower);
+    std::ranges::transform(extension, extension.begin(), std::towlower);
     if (extension != L".adf" && extension != L".hdf") return false;
 
     auto utf_file_path = real_file_path.string();
-    auto adf_device = std::unique_ptr<AdfDevice, void(*)(AdfDevice*)>(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READONLY), maybeCallAdfDevUnMount);
-    adfDevMount(adf_device.get());
-    if (!adf_device) return false;
 
-    auto adf_volume = std::unique_ptr<AdfVolume, void(*)(AdfVolume*)>(adfVolMount(adf_device.get(), 0, ADF_ACCESS_MODE_READONLY), maybeCallAdfVolUnMount);
-    if (!adf_volume) return false;
+    mAdfDevice.reset(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READONLY));
+    if (!mAdfDevice) return false;
+    adfDevMount(mAdfDevice.get());
+
+    mAdfVolume.reset(adfVolMount(mAdfDevice.get(), 0, ADF_ACCESS_MODE_READONLY));
+    if (!mAdfVolume) {
+        mAdfDevice.reset();
+        return false;
+    }
 
     // Supported extension, path is valid. Accept.
     mPath = real_file_path;
-    mAdfDevice = std::move(adf_device);
-    mAdfVolume = std::move(adf_volume);
 
     return true;
 }
 
 bool cADFPluginData::ReadDirectory(LPVFSREADDIRDATAW lpRDD) {
-
     // Free directory if lister is closing (otherwise ignore free command)
     if (lpRDD->vfsReadOp == VFSREAD_FREEDIRCLOSE)
         return true;
@@ -473,7 +472,8 @@ int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
     }
     DateTime dt = ToDateTime(ft);
 
-    int fd = adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, adf_file_name.data() /*, dt */);
+    // TODO: check return codes?
+    adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, adf_file_name.data() /*, dt */);
     DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_MAKEDIR, Final.c_str());
 
     auto directory = GetCurrentDirectoryList();

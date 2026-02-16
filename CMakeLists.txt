@@ -97,7 +97,8 @@ target_compile_definitions(opusADF PRIVATE ${CPP_DIRECTIVES})
 # Compiler flags
 if(MSVC)
     target_compile_options(opusADF PRIVATE
-        /W3      # Warning level 3
+        /W4      # Warning level
+        /wd4100  # Unreferenced formal parameter
         $<$<CONFIG:Debug>:/Od>   # Disable optimization for Debug
         $<$<CONFIG:Release>:/O1> # Optimize for size
         $<$<CONFIG:Release>:/Oy> # Omit frame pointers

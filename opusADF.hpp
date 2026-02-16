@@ -8,11 +8,9 @@ typedef std::weak_ptr<AdfVolume>   wpVolume;
 class cADFFindData {
 
 public:
-
     spList mHead;
     AdfList*  mCell;
     std::regex mFindMask;
-
 };
 
 class cADFPluginData {
@@ -42,15 +40,15 @@ public:
     bool AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast = false);
 
     bool ReadDirectory(LPVFSREADDIRDATAW lpRDD);
-    bool ReadFile(AdfFile* pFile, size_t pBytes, std::uint8_t* pBuffer, LPDWORD pReadSize );
+    bool ReadFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD readSize);
 
     AdfFile* OpenFile(std::wstring pPath);
     void CloseFile(AdfFile* pFile);
  
-    size_t TotalFreeBlocks(const std::wstring& pFile);
-    size_t TotalDiskBlocks(const std::wstring& pFile);
+    size_t GetAvailableSize(const std::wstring& pFile);
+    size_t GetTotalSize(const std::wstring& pFile);
 
-    int Delete(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPath, const std::wstring& pFile, bool pAll = false);
+    int Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, const std::wstring& pFile, bool pAll = false);
 
     cADFFindData *FindFirstFile(LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
     bool FindNextFile(cADFFindData* lpRAF, LPWIN32_FIND_DATA lpwfdData);
@@ -65,7 +63,7 @@ public:
     int ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPath, const std::wstring& pDest);
 
     int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
-    UINT BatchOperation(LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData);
+    uint32_t BatchOperation(std::wstring_view lpszPath, LPVFSBATCHDATAW lpBatchData);
     bool PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
 
 };

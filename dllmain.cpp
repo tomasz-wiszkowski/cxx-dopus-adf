@@ -1,4 +1,5 @@
-// dllmain.cpp : Defines the entry point for the DLL application.
+#include <strsafe.h>
+
 #include "stdafx.h"
 
 // 8040a29e-0754-4ed7-a532-3688e08fff41
@@ -10,25 +11,25 @@ HINSTANCE g_hModuleInstance = 0;
 extern "C"
 {
     __declspec(dllexport) bool VFS_IdentifyW(LPVFSPLUGININFOW lpVFSInfo);
-    __declspec(dllexport) bool VFS_ReadDirectoryW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPVFSREADDIRDATAW lpRDD);
+    __declspec(dllexport) bool VFS_ReadDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPVFSREADDIRDATAW lpRDD);
 
-    __declspec(dllexport) HANDLE VFS_Create(LPGUID pGuid);
-    __declspec(dllexport) void VFS_Destroy(HANDLE hData);
+    __declspec(dllexport) cADFPluginData* VFS_Create(LPGUID pGuid);
+    __declspec(dllexport) void VFS_Destroy(cADFPluginData* hData);
 
-    __declspec(dllexport) HANDLE VFS_CreateFileW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, DWORD dwMode, DWORD dwFileAttr, DWORD dwFlags, LPFILETIME lpFT);
+    __declspec(dllexport) AdfFile* VFS_CreateFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, DWORD dwMode, DWORD dwFileAttr, DWORD dwFlags, LPFILETIME lpFT);
 
-    __declspec(dllexport) bool VFS_ReadFile(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFile, LPVOID lpData, DWORD dwSize, LPDWORD lpdwReadSize);
-    __declspec(dllexport) void VFS_CloseFile(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFile);
+    __declspec(dllexport) bool VFS_ReadFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile, LPVOID lpData, DWORD dwSize, LPDWORD lpdwReadSize);
+    __declspec(dllexport) void VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile);
 
-    __declspec(dllexport) int VFS_ContextVerbW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPVFSCONTEXTVERBDATAW lpVerbData);
-    __declspec(dllexport) UINT VFS_BatchOperationW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData);
-    __declspec(dllexport) bool VFS_PropGetW(HANDLE hVFSData, vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
+    __declspec(dllexport) int VFS_ContextVerbW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPVFSCONTEXTVERBDATAW lpVerbData);
+    __declspec(dllexport) UINT VFS_BatchOperationW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData);
+    __declspec(dllexport) bool VFS_PropGetW(cADFPluginData* hVFSData, vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
 
-    __declspec(dllexport) bool VFS_GetFreeDiskSpaceW(HANDLE hData, LPVFSFUNCDATA lpFuncData, LPWSTR lpszPath, unsigned __int64* piFreeBytesAvailable, unsigned __int64* piTotalBytes, unsigned __int64* piTotalFreeBytes);
+    __declspec(dllexport) bool VFS_GetFreeDiskSpaceW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPWSTR lpszPath, unsigned __int64* piFreeBytesAvailable, unsigned __int64* piTotalBytes, unsigned __int64* piTotalFreeBytes);
 
-    __declspec(dllexport) HANDLE VFS_FindFirstFileW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
-    __declspec(dllexport) bool VFS_FindNextFileW(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFind, LPWIN32_FIND_DATA lpwfdData);
-    __declspec(dllexport) void VFS_FindClose(HANDLE hData, HANDLE hFind);
+    __declspec(dllexport) cADFFindData* VFS_FindFirstFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
+    __declspec(dllexport) bool VFS_FindNextFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, cADFFindData* hFind, LPWIN32_FIND_DATA lpwfdData);
+    __declspec(dllexport) void VFS_FindClose(cADFPluginData* hData, cADFFindData hFind);
 
 
     __declspec(dllexport) bool VFS_USBSafe(LPOPUSUSBSAFEDATA pUSBSafeData);
@@ -44,12 +45,13 @@ extern "C" int WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID) {
 
 // Initialise plugin
 bool VFS_Init(LPVFSINITDATA pInitData) {
-
     adfEnvInitDefault();
+    adfLibInit();
     return true;
 }
 
 void VFS_Uninit() {
+    adfLibCleanUp();
     adfEnvCleanUp();
 }
 
@@ -72,73 +74,62 @@ bool VFS_USBSafe(LPOPUSUSBSAFEDATA pUSBSafeData) {
     return true;
 }
 
-HANDLE VFS_Create(LPGUID pGuid) {
-    adfLibInit();
-    return (HANDLE)new cADFPluginData();
+cADFPluginData* VFS_Create(LPGUID pGuid) {
+    return new cADFPluginData();
 }
 
-void VFS_Destroy(HANDLE hData) {
-    delete (cADFPluginData*)hData;
+void VFS_Destroy(cADFPluginData* hData) {
+    delete hData;
 }
 
-bool VFS_ReadFile(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFile, LPVOID lpData, DWORD dwSize, LPDWORD lpdwReadSize) {
-    return (hData) ? ((cADFPluginData*)hData)->ReadFile((AdfFile*)hFile, dwSize, (std::uint8_t*) lpData, lpdwReadSize) : false;
-    
+bool VFS_ReadFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile, LPVOID lpData, DWORD dwSize, LPDWORD lpdwReadSize) {
+    if (!hData || !hFile || !lpData || !lpdwReadSize) return false;
+
+    return hData->ReadFile(hFile, std::span<uint8_t>(static_cast<uint8_t*>(lpData), dwSize), lpdwReadSize);
 }
 
-void VFS_CloseFile(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFile) {
-    ((cADFPluginData*)hData)->CloseFile((AdfFile*)hFile);
+void VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile) {
+    hData->CloseFile(hFile);
 }
 
-HANDLE VFS_CreateFileW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, DWORD dwMode, DWORD dwFileAttr, DWORD dwFlags, LPFILETIME lpFT) {
-    return (hData) ? ((cADFPluginData*)hData)->OpenFile(lpszPath) : 0;
-
+AdfFile* VFS_CreateFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, DWORD dwMode, DWORD dwFileAttr, DWORD dwFlags, LPFILETIME lpFT) {
+    return (hData) ? hData->OpenFile(lpszPath) : nullptr;
 }
 
-bool VFS_ReadDirectoryW(HANDLE hData, LPVFSFUNCDATA lpFuncData, LPVFSREADDIRDATAW lpRDD) {
-    return (hData) ? ((cADFPluginData*)hData)->ReadDirectory(lpRDD) : false;
+bool VFS_ReadDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSREADDIRDATAW lpRDD) {
+    return (hData) ? hData->ReadDirectory(lpRDD) : false;
 }
 
-int VFS_ContextVerbW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPVFSCONTEXTVERBDATAW lpVerbData) {
-
-    return (hData) ? ((cADFPluginData*)hData)->ContextVerb(lpVerbData) : VFSCVRES_FAIL;
+int VFS_ContextVerbW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPVFSCONTEXTVERBDATAW lpVerbData) {
+    return (hData) ? hData->ContextVerb(lpVerbData) : VFSCVRES_FAIL;
 }
 
-UINT VFS_BatchOperationW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData) {
-    return (hData) ? ((cADFPluginData*)hData)->BatchOperation(lpszPath, lpBatchData) : VFSCVRES_FAIL;
+UINT VFS_BatchOperationW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData) {
+    return (hData) ? hData->BatchOperation(lpszPath, lpBatchData) : VFSCVRES_FAIL;
 }
 
-bool VFS_PropGetW(HANDLE hData, vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3) {
-
-    return (hData) ? ((cADFPluginData*)hData)->PropGet(propId, lpPropData, lpData1, lpData2, lpData3) : VFSCVRES_FAIL;
+bool VFS_PropGetW(cADFPluginData* hData, vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3) {
+    return (hData) ? hData->PropGet(propId, lpPropData, lpData1, lpData2, lpData3) : VFSCVRES_FAIL;
 }
 
-bool VFS_GetFreeDiskSpaceW(HANDLE hData, LPVFSFUNCDATA lpFuncData, LPWSTR lpszPath, unsigned __int64* piFreeBytesAvailable, unsigned __int64* piTotalBytes, unsigned __int64* piTotalFreeBytes) {
+bool VFS_GetFreeDiskSpaceW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPWSTR lpszPath, uint64_t* piFreeBytesAvailable, uint64_t* piTotalBytes, uint64_t* piTotalFreeBytes) {
+    if (!hData) return false;
 
-    if (!hData)
-        return false;
-
-    if(piFreeBytesAvailable)
-        *piFreeBytesAvailable = ((cADFPluginData*)hData)->TotalFreeBlocks(lpszPath);
-
-    if(piTotalFreeBytes)
-        *piTotalFreeBytes = ((cADFPluginData*)hData)->TotalFreeBlocks(lpszPath);
-
-    if(piTotalBytes)
-        *piTotalBytes = ((cADFPluginData*)hData)->TotalDiskBlocks(lpszPath);
+    if (piFreeBytesAvailable) *piFreeBytesAvailable = hData->GetAvailableSize(lpszPath);
+    if (piTotalFreeBytes) *piTotalFreeBytes = hData->GetAvailableSize(lpszPath);
+    if (piTotalBytes) *piTotalBytes = hData->GetTotalSize(lpszPath);
     
     return true;
 }
 
-HANDLE VFS_FindFirstFileW(HANDLE hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent) {
-
-    return (hData) ? (HANDLE)((cADFPluginData*)hData)->FindFirstFile(lpszPath, lpwfdData, hAbortEvent) : INVALID_HANDLE_VALUE;
+cADFFindData* VFS_FindFirstFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent) {
+    return (hData) ? hData->FindFirstFile(lpszPath, lpwfdData, hAbortEvent) : (cADFFindData*)INVALID_HANDLE_VALUE;
 }
 
-bool VFS_FindNextFileW(HANDLE hData, LPVFSFUNCDATA lpVFSData, HANDLE hFind, LPWIN32_FIND_DATA lpwfdData) {
-    return (hData && hFind) ? ((cADFPluginData*)hData)->FindNextFile((cADFFindData*)hFind, lpwfdData) : false;
+bool VFS_FindNextFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, cADFFindData* hFind, LPWIN32_FIND_DATA lpwfdData) {
+    return (hData && hFind) ? hData->FindNextFile(hFind, lpwfdData) : false;
 }
 
-void VFS_FindClose(HANDLE hData, HANDLE hFind) {
-    if (hData && hFind) ((cADFPluginData*)hData)->FindClose((cADFFindData*)hFind);
+void VFS_FindClose(cADFPluginData* hData, cADFFindData* hFind) {
+    if (hData && hFind) hData->FindClose(hFind);
 }

@@ -96,9 +96,13 @@ target_compile_definitions(opusADF PRIVATE ${CPP_DIRECTIVES})
 
 # Compiler flags
 if(MSVC)
+    # Disable runtime checks to allow /O1 in debug builds.
+    # string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+
     target_compile_options(opusADF PRIVATE
         /W4      # Warning level
         /wd4100  # Unreferenced formal parameter
+        # $<$<CONFIG:Debug>:/O1 /Zi /d2Zi+ /Zo /Oy>
         $<$<CONFIG:Debug>:/Od>   # Disable optimization for Debug
         $<$<CONFIG:Release>:/O1> # Optimize for size
         $<$<CONFIG:Release>:/Oy> # Omit frame pointers

@@ -31,6 +31,7 @@ extern "C"
     __declspec(dllexport) bool VFS_FindNextFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, cADFFindData* hFind, LPWIN32_FIND_DATA lpwfdData);
     __declspec(dllexport) void VFS_FindClose(cADFPluginData* hData, cADFFindData hFind);
 
+    __declspec(dllexport) BOOL VFS_ExtractFilesW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSEXTRACTFILESDATA lpExtractData);
 
     __declspec(dllexport) bool VFS_USBSafe(LPOPUSUSBSAFEDATA pUSBSafeData);
     __declspec(dllexport) bool VFS_Init(LPVFSINITDATA pInitData);
@@ -101,11 +102,11 @@ bool VFS_ReadDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSRE
 }
 
 int VFS_ContextVerbW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPVFSCONTEXTVERBDATAW lpVerbData) {
-    return (hData) ? hData->ContextVerb(lpVerbData) : VFSCVRES_FAIL;
+    return hData->ContextVerb(lpVerbData);
 }
 
 UINT VFS_BatchOperationW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, LPWSTR lpszPath, LPVFSBATCHDATAW lpBatchData) {
-    return (hData) ? hData->BatchOperation(lpszPath, lpBatchData) : VFSCVRES_FAIL;
+    return hData->BatchOperation(lpszPath, lpBatchData);
 }
 
 bool VFS_PropGetW(cADFPluginData* hData, vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3) {
@@ -132,4 +133,8 @@ bool VFS_FindNextFileW(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, cADFFindD
 
 void VFS_FindClose(cADFPluginData* hData, cADFFindData* hFind) {
     if (hData && hFind) hData->FindClose(hFind);
+}
+
+BOOL VFS_ExtractFilesW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSEXTRACTFILESDATA lpExtractData) {
+    return false;
 }

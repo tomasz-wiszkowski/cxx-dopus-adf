@@ -8,6 +8,25 @@
 #include "stdafx.h"
 #include "text_utils.hh"
 
+namespace {
+/// @brief Predicate to check if an AdfEntry is a supported type (file or directory).
+/// @param type The AdfEntry type to check.
+/// @return Whether the type is supported.
+constexpr bool IsSupportedEntryType(int type) {
+    return type == ADF_ST_FILE || type == ADF_ST_DIR;
+}
+
+/// @brief Predicate for finding an AdfEntry by name in a directory listing.
+struct AdfFindEntry {
+    const std::string name;
+    AdfFindEntry(std::wstring_view name) : name(wstring_to_latin1(name)) {}
+
+    bool operator()(const AdfEntry& entry) const {
+        return IsSupportedEntryType(entry.type) && name == entry.name;
+    }
+};
+}
+
 struct DateTime {
 	int year, mon, day, hour, min, sec;
 };
@@ -143,15 +162,8 @@ bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) 
     if (pIgnoreLast) components.pop_back();
 
     for (auto& component : components) {
-        auto adf_component = wstring_to_latin1(component);
         auto directory = GetCurrentDirectoryList();
-
-        auto entry = std::ranges::find_if(directory, [&adf_component](const AdfEntry& entry) {
-            if (entry.type == ADF_ST_LFILE || entry.type == ADF_ST_LDIR || entry.type == ADF_ST_LSOFT) {
-                return false;
-            }
-            return adf_component == entry.name;
-        });
+        auto entry = std::ranges::find_if(directory, AdfFindEntry(component));
 
         // No matching entry found for this component, path is invalid.
         if (entry == directory.end()) return false;
@@ -240,19 +252,19 @@ bool cADFPluginData::ReadDirectory(LPVFSREADDIRDATAW lpRDD) {
     auto directory = GetCurrentDirectoryList();
 
     LPVFSFILEDATAHEADER lpLastHeader = 0;
+
     for (const AdfEntry& entry : directory) {
-        if (!(entry.type == ADF_ST_LFILE || entry.type == ADF_ST_LDIR || entry.type == ADF_ST_LSOFT)) {
-            LPVFSFILEDATAHEADER lpFDH = GetVFSforEntry(&entry, lpRDD->hMemHeap);
+        if (!IsSupportedEntryType(entry.type)) continue; 
+        LPVFSFILEDATAHEADER lpFDH = GetVFSforEntry(&entry, lpRDD->hMemHeap);
 
-            // Add the entries for this folder
-            if (lpFDH) {
-                if (lpLastHeader)
-                    lpLastHeader->lpNext = lpFDH;
-                else
-                    lpRDD->lpFileData = lpFDH;
+        // Add the entries for this folder
+        if (lpFDH) {
+            if (lpLastHeader)
+                lpLastHeader->lpNext = lpFDH;
+            else
+                lpRDD->lpFileData = lpFDH;
 
-                lpLastHeader = lpFDH;
-            }
+            lpLastHeader = lpFDH;
         }
     }
 
@@ -372,9 +384,7 @@ bool cADFPluginData::FindNextFile(cADFFindData* pFindData, LPWIN32_FIND_DATA lpw
 
     for (; iter != directory.end(); ++iter) {
         // TODO: this is incorrect. This tries to operate on Latin1 characters, but should instead operate on the wide strings.
-        if (!std::regex_match(iter->name, pattern)) continue;
-        if (iter->type == ADF_ST_LFILE || iter->type == ADF_ST_LDIR || iter->type == ADF_ST_LSOFT) continue;
-        break;
+        if (IsSupportedEntryType(iter->type) && std::regex_match(iter->name, pattern)) break;
     }
 
     if (iter == directory.end()) return false;

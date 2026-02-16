@@ -3,13 +3,6 @@
 #include <filesystem>
 #include "adf_typed_list.hh"
 
-typedef std::shared_ptr<AdfList>   spList;
-typedef std::shared_ptr<AdfDevice> spDevice;
-typedef std::shared_ptr<AdfVolume> spVolume;
-
-typedef std::weak_ptr<AdfDevice>   wpDevice;
-typedef std::weak_ptr<AdfVolume>   wpVolume;
-
 class cADFFindData {
 public:
     cADFFindData(AdfTypedList<AdfEntry>&& directory) : mDirectoryList(std::move(directory)), mCurrentEntry(mDirectoryList.begin()) {}
@@ -20,13 +13,12 @@ public:
 };
 
 class cADFPluginData {
-
     HINSTANCE				mAdfDll;
     size_t                  mLastError;
     std::filesystem::path   mPath;
 
-    spDevice                mAdfDevice;
-    spVolume                mAdfVolume;
+    std::unique_ptr<AdfDevice, void(*)(AdfDevice*)> mAdfDevice;
+    std::unique_ptr<AdfVolume, void(*)(AdfVolume*)> mAdfVolume;
 
 protected:
 
@@ -37,8 +29,7 @@ protected:
     void                SetEntryTime(AdfFile *pFile, FILETIME pFT);
 
     bool LoadFile(std::wstring_view pAfPath);
-    spList GetCurrentDirectoryList();
-    AdfTypedList<AdfEntry> GetCurrentDirectoryList2();
+    AdfTypedList<AdfEntry> GetCurrentDirectoryList();
 
 public:
     cADFPluginData();
@@ -72,5 +63,4 @@ public:
     int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
     uint32_t BatchOperation(std::wstring_view lpszPath, LPVFSBATCHDATAW lpBatchData);
     bool PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
-
 };

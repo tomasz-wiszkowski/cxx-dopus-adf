@@ -1,3 +1,5 @@
+#include "adf_typed_list.hh"
+
 typedef std::shared_ptr<AdfList>   spList;
 typedef std::shared_ptr<AdfDevice> spDevice;
 typedef std::shared_ptr<AdfVolume> spVolume;
@@ -32,6 +34,7 @@ protected:
 
     bool LoadFile(std::wstring_view pAfPath);
     spList GetCurrentDirectoryList();
+    AdfTypedList<AdfEntry> GetCurrentDirectoryList2();
 
 public:
     cADFPluginData();

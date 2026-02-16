@@ -61,6 +61,8 @@ set(OPUSADF_SOURCES
 
 # Header files
 set(OPUSADF_HEADERS
+    adf_typed_iterator.hh
+    adf_typed_list.hh
     opusADF.hpp
     stdafx.h
     text_utils.hh

@@ -1,10 +1,9 @@
 // opusADF.cpp : Defines the exported functions for the DLL application.
 //
 
-#include "stdafx.h"
-
 #include <strsafe.h>
 
+#include "stdafx.h"
 #include "text_utils.hh"
 
 struct DateTime {
@@ -154,48 +153,47 @@ bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) 
             components.pop_back();
     }
 
-    if (mAdfVolume) {
+    if (!mAdfVolume) return false;
 
-        adfToRootDir(mAdfVolume.get());
+    adfToRootDir(mAdfVolume.get());
 
-        auto head = GetCurrentDirectoryList();
-        AdfList *cell = head.get();
-        while (cell) {
-            struct AdfEntry* entry = (AdfEntry*)cell->content;
+    auto head = GetCurrentDirectoryList();
+    AdfList *cell = head.get();
+    while (cell) {
+        struct AdfEntry* entry = (AdfEntry*)cell->content;
 
-            if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
+        if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
 
-                if (components.size()) {
-                    auto Filename = latin1_to_wstring(entry->name);
+            if (components.size()) {
+                auto Filename = latin1_to_wstring(entry->name);
 
-                    // Found our sub directory?
-                    if (components[0] == Filename) {
+                // Found our sub directory?
+                if (components[0] == Filename) {
 
-                        // Free current cell, and load the next
-                        if (entry->type == ADF_ST_DIR || entry->type == ADF_ST_LDIR || components.size() > 1) {
-                            adfChangeDir(mAdfVolume.get(), entry->name);
+                    // Free current cell, and load the next
+                    if (entry->type == ADF_ST_DIR || entry->type == ADF_ST_LDIR || components.size() > 1) {
+                        adfChangeDir(mAdfVolume.get(), entry->name);
 
-                            head = GetCurrentDirectoryList();
-                            cell = head.get();
-                        }
-
-                        components.erase(components.begin());
-
-                        // Empty folder?
-                        if (!cell || !components.size())
-                            return true;
-
-                        continue;
+                        head = GetCurrentDirectoryList();
+                        cell = head.get();
                     }
-                }
-                else {
-                    result = true;
-                    break;
+
+                    components.erase(components.begin());
+
+                    // Empty folder?
+                    if (!cell || !components.size())
+                        return true;
+
+                    continue;
                 }
             }
-
-            cell = cell->next;
+            else {
+                result = true;
+                break;
+            }
         }
+
+        cell = cell->next;
     }
 
     return result;
@@ -264,13 +262,10 @@ bool cADFPluginData::ReadDirectory(LPVFSREADDIRDATAW lpRDD) {
     if (lpRDD->vfsReadOp == VFSREAD_CHANGEDIR)
         return true;
 
-    auto head = GetCurrentDirectoryList();
-    AdfList *cell = head.get();
+    auto directory = GetCurrentDirectoryList2();
 
     LPVFSFILEDATAHEADER lpLastHeader = 0;
-    while (cell) {
-        struct AdfEntry* entry = (AdfEntry*)cell->content;
-
+    for (AdfEntry* entry : directory) {
         if (!(entry->type == ADF_ST_LFILE || entry->type == ADF_ST_LDIR || entry->type == ADF_ST_LSOFT)) {
             LPVFSFILEDATAHEADER lpFDH = GetVFSforEntry(entry, lpRDD->hMemHeap);
 
@@ -284,8 +279,6 @@ bool cADFPluginData::ReadDirectory(LPVFSREADDIRDATAW lpRDD) {
                 lpLastHeader = lpFDH;
             }
         }
-
-        cell = cell->next;
     }
 
     return true;
@@ -314,28 +307,23 @@ spList cADFPluginData::GetCurrentDirectoryList() {
     return std::shared_ptr<AdfList>(adfGetDirEnt(mAdfVolume.get(), mAdfVolume->curDirPtr), adfFreeDirList);
 }
 
+AdfTypedList<AdfEntry> cADFPluginData::GetCurrentDirectoryList2() {
+    return AdfTypedList<AdfEntry>(
+            adfGetDirEnt(mAdfVolume.get(), mAdfVolume->curDirPtr),
+            adfFreeDirList);
+}
+
 int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
-    if (AdfChangeToPath(lpVerbData->lpszPath, true)) {
-        auto want_file_name = file_from_path(lpVerbData->lpszPath);
+    if (!AdfChangeToPath(lpVerbData->lpszPath, true)) return VFSCVRES_FAIL;
 
-        auto head = GetCurrentDirectoryList();
-        AdfList *cell = head.get();
+    auto want_file_name = wstring_to_latin1(file_from_path(lpVerbData->lpszPath));
+    auto directory = GetCurrentDirectoryList2();
 
-        while (cell) {
-            struct AdfEntry* entry = (AdfEntry*)cell->content;
-            auto Filepath = latin1_to_wstring(entry->name);
+    for (AdfEntry* entry : directory) {
+        if (want_file_name != entry->name) continue;
 
-            if (Filepath == want_file_name) {
-
-                if (entry->type == ADF_ST_FILE)
-                    return VFSCVRES_EXTRACT;
-
-                if (entry->type == ADF_ST_DIR)
-                    return VFSCVRES_DEFAULT;
-            }
-
-            cell = cell->next;
-        }
+        if (entry->type == ADF_ST_FILE) return VFSCVRES_EXTRACT;
+        if (entry->type == ADF_ST_DIR) return VFSCVRES_DEFAULT;
     }
 
     return VFSCVRES_FAIL;
@@ -344,31 +332,26 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
 int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, const std::wstring& pFile, bool pAll) {
     int result = 0;
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Deleting");
+    auto adf_file_name = wstring_to_latin1(file_from_path(pFile));
 
-    auto components = split_path_to_components(pFile);
-
+    // TODO: magic numbers
     if (!AdfChangeToPath(path)) return 0;
 
-    auto head = GetCurrentDirectoryList();
-    AdfList *cell = head.get();
-
-    while (cell)
-    {
-        if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0)
-        {
-            return 1;
-        }
-
-        struct AdfEntry *entry = (AdfEntry *)cell->content;
-        auto Filename = latin1_to_wstring(entry->name);
+    auto directory = GetCurrentDirectoryList2();
+    for (AdfEntry* entry : directory) {
+        // TODO: magic numbers
+        if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) return 1;
 
         // Entry match?
-        if (pAll || (components[components.size() - 1] == Filename))
-        {
-            DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)entry->name);
-            DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry->size);
+        if (pAll || adf_file_name == entry->name) {
+            {
+                // Convert filename to show in progress bar
+                auto filename = latin1_to_wstring(entry->name);
+                DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.data());
+                DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry->size);
+            }
 
-            // TODO: perhaps can avoid creating strings here.
+            // TODO: perhaps can avoid creating strings here. Not sure why that is needed.
             std::wstring Filename(path);
 
             if (Filename[Filename.size() - 1] != '\\')
@@ -393,8 +376,6 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, 
                     DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_REMDIR, Filename.c_str());
             }
         }
-
-        cell = cell->next;
     }
 
     return 0;
@@ -527,10 +508,12 @@ int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
     if (FinalPath[FinalPath.size() - 1] != L'\\')
         FinalPath += L"\\";
 
-    auto want_file_name = file_from_path(pPath);
+    auto sys_file_name = file_from_path(pPath);
+    auto adf_file_name = wstring_to_latin1(sys_file_name);
     std::wstring Final(FinalPath);
-    Final += want_file_name;
+    Final += sys_file_name;
 
+    // TODO: Dead code below -> dt not consumed, investigate api?
     FILETIME ft;
     {
         HANDLE file = CreateFile(pPath.data(), FILE_READ_ATTRIBUTES, 0, 0, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
@@ -539,55 +522,49 @@ int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
     }
     DateTime dt = ToDateTime(ft);
 
-    int fd = adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, wstring_to_latin1(want_file_name).data() /*, dt */);
+    int fd = adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, adf_file_name.data() /*, dt */);
     DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_MAKEDIR, Final.c_str());
 
-    auto head = GetCurrentDirectoryList();
-    AdfList *cell = head.get();
+    auto directory = GetCurrentDirectoryList2();
+    for (AdfEntry* entry : directory) {
+        if (adf_file_name != entry->name) continue;
 
-    while (cell) {
-        struct AdfEntry* entry = (AdfEntry*)cell->content;
-        auto Filename = latin1_to_wstring(entry->name);
+        auto contents = directoryList(FinalPath + L"*.*");
 
-        if (Filename == want_file_name) {
+        for (auto& file : contents) {
+            if (file == L"." || file == L"..")
+                continue;
 
-            auto contents = directoryList(FinalPath + L"*.*");
-
-            for (auto& file : contents) {
-                if (file == L"." || file == L"..")
-                    continue;
-
-                std::wstring name = std::wstring(pFile) + L"\\" + std::wstring(want_file_name) + L"\\" + file;
-                Import(lpBatchData, name, FinalPath + file);
-            }
-
+            // TODO: perhaps can avoid creating strings here. Investigate use.
+            std::wstring name = Final + L"\\" + file;
+            Import(lpBatchData, name, FinalPath + file);
         }
-
-        cell = cell->next;
     }
-
 
     return 0;
 }
 
 int cADFPluginData::Import(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath) {
+    // TODO: magic numbers
+    if (!AdfChangeToPath(pFile, false)) return 0;
 
-    if (AdfChangeToPath(pFile, false)) {
-
-        if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) {
-            return 1;
-        }
-
-        // is pPath a directory?
-        auto Attribs = GetFileAttributes(pPath.data());
-
-        if (Attribs & FILE_ATTRIBUTE_DIRECTORY)
-            ImportPath(lpBatchData, pFile, pPath);
-        else {
-            ImportFile(lpBatchData, pFile, pPath);
-        }
+    if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0)
+    {
+        return 1;
     }
 
+    // is pPath a directory?
+    auto Attribs = GetFileAttributes(pPath.data());
+
+    if (Attribs & FILE_ATTRIBUTE_DIRECTORY)
+        ImportPath(lpBatchData, pFile, pPath);
+    else
+    {
+        ImportFile(lpBatchData, pFile, pPath);
+    }
+
+    // TODO: why 0? is that a success or failure? if success, then the AdfChangeToPath failure above should probably
+    // return a different code, and if failure, then we should return a different code here too. Investigate.
     return 0;
 }
 
@@ -600,16 +577,11 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
 
     auto want_file_name = file_from_path(pFile);
 
-    auto head = GetCurrentDirectoryList();
-    AdfList *cell = head.get();
-
-    while (cell) {
-
+    auto directory = GetCurrentDirectoryList2();
+    for (AdfEntry* entry : directory) {
         if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) {
             return 1;
         }
-
-        struct AdfEntry* entry = (AdfEntry*)cell->content;
 
         std::wstring FinalName = pDest;
         if (FinalName[FinalName.size() - 1] != '\\') {
@@ -644,8 +616,6 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
             DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_NEXTFILE, 0);
             break;
         }
-
-        cell = cell->next;
     }
 
     return result;
@@ -656,13 +626,8 @@ int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring&
 
     if (!AdfChangeToPath(pPath)) return result;
 
-    auto head = GetCurrentDirectoryList();
-    AdfList *cell = head.get();
-
-    while (cell)
-    {
-        struct AdfEntry *entry = (AdfEntry *)cell->content;
-
+    auto directory = GetCurrentDirectoryList2();
+    for (AdfEntry* entry : directory) {
         std::wstring FinalPath = pPath;
         if (FinalPath[FinalPath.size() - 1] != '\\')
         {
@@ -672,8 +637,6 @@ int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring&
         FinalPath += Filepath;
 
         result |= Extract(lpBatchData, FinalPath, pDest);
-
-        cell = cell->next;
     }
 
     return result;

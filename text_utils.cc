@@ -60,6 +60,11 @@ std::string wstring_to_latin1(std::wstring_view wide) {
     return latin1;
 }
 
+std::filesystem::path wstring_to_path(std::wstring_view wide) {
+    return std::filesystem::path(wide);
+}
+
+
 std::vector<std::wstring_view> split_path_to_components(std::wstring_view path, std::wstring_view relative_to) {
     std::vector<std::wstring_view> components;
     std::wstring::size_type pos_begin, pos_end = 0;

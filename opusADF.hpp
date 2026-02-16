@@ -1,3 +1,6 @@
+#pragma once
+
+#include <filesystem>
 #include "adf_typed_list.hh"
 
 typedef std::shared_ptr<AdfList>   spList;
@@ -19,10 +22,10 @@ class cADFPluginData {
 
     HINSTANCE				mAdfDll;
     size_t                  mLastError;
-    std::wstring             mPath;
+    std::filesystem::path   mPath;
 
-    spDevice                 mAdfDevice;
-    spVolume                 mAdfVolume;
+    spDevice                mAdfDevice;
+    spVolume                mAdfVolume;
 
 protected:
 

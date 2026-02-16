@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,11 @@ std::wstring latin1_to_wstring(std::string_view latin1);
 /// @param wide Input string in wide character encoding (UTF-16 on Windows)
 /// @return latin1 encoded string
 std::string wstring_to_latin1(std::wstring_view wide);
+
+/// @brief Convert a wide string to utf8 encoding
+/// @param wide Input string in wide character encoding (UTF-16 on Windows)
+/// @return latin1 encoded string
+std::filesystem::path wstring_to_path(std::wstring_view wide);
 
 /// @brief Split a path string into its components
 /// @param path Input string to split

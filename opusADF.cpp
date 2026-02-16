@@ -1,6 +1,7 @@
 // opusADF.cpp : Defines the exported functions for the DLL application.
 //
 
+#include <filesystem>
 #include <strsafe.h>
 
 #include "stdafx.h"
@@ -92,9 +93,7 @@ DateTime ToDateTime(FILETIME pFT) {
 }
 
 void cADFPluginData::SetEntryTime(AdfFile *pFile, FILETIME pFT) {
-
     DateTime dt = ToDateTime(pFT);
-
     adfTime2AmigaTime(dt, &(pFile->fileHdr->days), &(pFile->fileHdr->mins), &(pFile->fileHdr->ticks));
 }
 
@@ -146,7 +145,7 @@ bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) 
 
     adfToRootDir(mAdfVolume.get());
 
-    auto components = split_path_to_components(pPath, mPath);
+    auto components = split_path_to_components(pPath, mPath.wstring());
     if (components.empty()) return !pIgnoreLast; // Root directory cannot ignore last component.
     if (pIgnoreLast) components.pop_back();
 
@@ -179,34 +178,41 @@ static void maybeCallAdfVolUnMount(AdfVolume* volume) {
     if (volume) adfVolUnMount(volume);
 }
 
+// TODO: migrate all to std::filesystem::path.
 bool cADFPluginData::LoadFile(std::wstring_view pAdfPath) {
-    std::wstring AdfPath(pAdfPath);
-
-    std::transform(AdfPath.begin(), AdfPath.end(), AdfPath.begin(), ::tolower);
-    size_t EndPos = AdfPath.find(L".adf");
-    if (EndPos == std::wstring::npos) {
-        EndPos = AdfPath.find(L".hdf");
+    if (!mPath.empty() && pAdfPath.starts_with(mPath.wstring())) {
+        // Path is already loaded, no need to check again.
+        return true;
     }
-    if (EndPos == std::wstring::npos)
-        return false;
-    AdfPath = pAdfPath.substr(0, EndPos + 4);
 
-    if (!mAdfDevice || !mAdfVolume) {
-        // Find an open device for this disk image
-        auto Filepath = wstring_to_latin1(AdfPath);
+    // Loading new file. Should we cache this?
+    mPath.clear();
 
-        mAdfDevice = std::move(std::shared_ptr<AdfDevice>(adfDevOpen(const_cast<CHAR*>(Filepath.c_str()), ADF_ACCESS_MODE_READONLY), maybeCallAdfDevUnMount));
-        adfDevMount(mAdfDevice.get());
-        if(mAdfDevice)
-            mAdfVolume = std::shared_ptr<AdfVolume>(adfVolMount(mAdfDevice.get(), 0, ADF_ACCESS_MODE_READONLY), maybeCallAdfVolUnMount);
-                
-        if (mAdfVolume) {
-            mPath = AdfPath;
-            return true;
-        }
-
-        return false;
+    // Walk the pAdfPath up until we find the valid file.
+    std::filesystem::path real_file_path = pAdfPath;
+    while (!real_file_path.empty()) {
+        if (std::filesystem::exists(real_file_path)) break;
+        real_file_path = real_file_path.parent_path();
     }
+    if (real_file_path.empty()) return false;
+
+    // Get extension and check if it's supported.
+    auto extension = real_file_path.extension().wstring();
+    std::ranges::transform(extension, extension.begin(), ::tolower);
+    if (extension != L".adf" && extension != L".hdf") return false;
+
+    auto utf_file_path = real_file_path.string();
+    auto adf_device = std::shared_ptr<AdfDevice>(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READONLY), maybeCallAdfDevUnMount);
+    adfDevMount(adf_device.get());
+    if (!adf_device) return false;
+
+    auto adf_volume = std::shared_ptr<AdfVolume>(adfVolMount(adf_device.get(), 0, ADF_ACCESS_MODE_READONLY), maybeCallAdfVolUnMount);
+    if (!adf_volume) return false;
+
+    // Supported extension, path is valid. Accept.
+    mPath = real_file_path;
+    mAdfDevice = adf_device;
+    mAdfVolume = adf_volume;
 
     return true;
 }

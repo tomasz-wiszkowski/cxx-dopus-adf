@@ -313,9 +313,9 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
     return VFSCVRES_FAIL;
 }
 
-int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, std::wstring_view pFile, bool pAll) {
+int cADFPluginData::Delete(LPVOID func_data, std::wstring_view path, std::wstring_view pFile, bool pAll) {
     int result = 0;
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Deleting");
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Deleting");
     auto adf_file_name = wstring_to_latin1(file_from_path(pFile));
 
     // TODO: magic numbers
@@ -324,15 +324,15 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, 
     auto directory = GetCurrentDirectoryList();
     for (const AdfEntry& entry : directory) {
         // TODO: magic numbers
-        if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) return 1;
+        if (ShouldAbort()) return 1;
 
         // Entry match?
         if (pAll || adf_file_name == entry.name) {
             {
                 // Convert filename to show in progress bar
                 auto filename = latin1_to_wstring(entry.name);
-                DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.data());
-                DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry.size);
+                DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.data());
+                DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)entry.size);
             }
 
             // TODO: perhaps can avoid creating strings here. Not sure why that is needed.
@@ -347,17 +347,17 @@ int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, 
             {
                 result |= adfRemoveEntry(mAdfVolume.get(), entry.parent, entry.name);
                 if (!result)
-                    DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_REMDIR, Filename.c_str());
+                    DOpus.AddFunctionFileChange(func_data, true, OPUSFILECHANGE_REMDIR, Filename.c_str());
             }
 
             if (entry.type == ADF_ST_DIR)
             {
 
-                Delete(lpBatchData, Filename, Filepath, true);
+                Delete(func_data, Filename, Filepath, true);
                 result |= adfRemoveEntry(mAdfVolume.get(), entry.parent, entry.name);
                 AdfChangeToPath(path);
                 if (!result)
-                    DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_REMDIR, Filename.c_str());
+                    DOpus.AddFunctionFileChange(func_data, true, OPUSFILECHANGE_REMDIR, Filename.c_str());
             }
         }
     }
@@ -398,7 +398,7 @@ void cADFPluginData::FindClose(cADFFindData* pFindData) {
     delete pFindData;
 }
 
-int cADFPluginData::ImportFile(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath) {
+int cADFPluginData::ImportFile(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath) {
     // TODO: Handle file read errors
     // TODO: Don't read the entire file into memory at once
     std::ifstream t(pPath.data(), std::ios::binary);
@@ -406,8 +406,8 @@ int cADFPluginData::ImportFile(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
 
     auto filename = file_from_path(pPath);
 
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.data());
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)buffer.size());
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.data());
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)buffer.size());
 
 
     FILETIME ft;
@@ -430,7 +430,7 @@ int cADFPluginData::ImportFile(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
         Final += L"\\";
     Final += filename;
 
-    DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_CREATE, Final.c_str());
+    DOpus.AddFunctionFileChange(func_data, true, OPUSFILECHANGE_CREATE, Final.c_str());
 
     return 0;
 }
@@ -464,7 +464,7 @@ std::vector<std::wstring> directoryList(const std::wstring pPath) {
     return results;
 }
 
-int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath) {
+int cADFPluginData::ImportPath(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath) {
     std::wstring FinalPath(pPath);
     if (FinalPath[FinalPath.size() - 1] != L'\\')
         FinalPath += L"\\";
@@ -485,7 +485,7 @@ int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
 
     // TODO: check return codes?
     adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, adf_file_name.data() /*, dt */);
-    DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, true, OPUSFILECHANGE_MAKEDIR, Final.c_str());
+    DOpus.AddFunctionFileChange(func_data, true, OPUSFILECHANGE_MAKEDIR, Final.c_str());
 
     auto directory = GetCurrentDirectoryList();
     for (const AdfEntry& entry : directory) {
@@ -499,30 +499,27 @@ int cADFPluginData::ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pF
 
             // TODO: perhaps can avoid creating strings here. Investigate use.
             std::wstring name = Final + L"\\" + file;
-            Import(lpBatchData, name, FinalPath + file);
+            Import(func_data, name, FinalPath + file);
         }
     }
 
     return 0;
 }
 
-int cADFPluginData::Import(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath) {
+int cADFPluginData::Import(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath) {
     // TODO: magic numbers
     if (!AdfChangeToPath(pFile, false)) return 0;
 
-    if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0)
-    {
-        return 1;
-    }
+    if (ShouldAbort()) return 1;
 
     // is pPath a directory?
     auto Attribs = GetFileAttributes(pPath.data());
 
     if (Attribs & FILE_ATTRIBUTE_DIRECTORY)
-        ImportPath(lpBatchData, pFile, pPath);
+        ImportPath(func_data, pFile, pPath);
     else
     {
-        ImportFile(lpBatchData, pFile, pPath);
+        ImportFile(func_data, pFile, pPath);
     }
 
     // TODO: why 0? is that a success or failure? if success, then the AdfChangeToPath failure above should probably
@@ -530,11 +527,11 @@ int cADFPluginData::Import(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile,
     return 0;
 }
 
-bool cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::filesystem::path source_path, std::filesystem::path target_path) {
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Copying");
+bool cADFPluginData::Extract(LPVOID func_data, std::filesystem::path source_path, std::filesystem::path target_path) {
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Copying");
 
     if (!AdfChangeToPath(source_path.wstring(), true)) return false;
-    if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) return false;
+    if (ShouldAbort()) return false;
 
     auto directory = GetCurrentDirectoryList();
     // If filename is empty, it means the path ended with a slash, so get the parent directory name instead.
@@ -545,23 +542,23 @@ bool cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::filesystem::path 
 
     target_path.append(entry_name);
 
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILENAME, (DWORD_PTR)entry_name.data());
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)iter->size);
-    DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, /* fIsDest= */true, OPUSFILECHANGE_CREATE, target_path.c_str());
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILENAME, (DWORD_PTR)entry_name.data());
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)iter->size);
+    DOpus.AddFunctionFileChange(func_data, /* fIsDest= */true, OPUSFILECHANGE_CREATE, target_path.c_str());
 
     bool success;
     if (iter->type == ADF_ST_DIR) {
         std::filesystem::create_directories(target_path);
-        success = ExtractPath(lpBatchData, source_path, target_path);
+        success = ExtractPath(func_data, source_path, target_path);
     } else {
-        success = ExtractFile(lpBatchData, *iter, target_path);
+        success = ExtractFile(func_data, *iter, target_path);
     }
 
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_NEXTFILE, 0);
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_NEXTFILE, 0);
     return success;
 }
 
-bool cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, std::filesystem::path source_path, std::filesystem::path target_path) {
+bool cADFPluginData::ExtractPath(LPVOID func_data, std::filesystem::path source_path, std::filesystem::path target_path) {
     if (!AdfChangeToPath(source_path.wstring())) return false;
 
     auto directory = GetCurrentDirectoryList();
@@ -569,14 +566,14 @@ bool cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, std::filesystem::p
     for (const AdfEntry& entry : directory) {
         auto entry_name = latin1_to_wstring(entry.name);
         source_path.append(entry_name);
-        success &= Extract(lpBatchData, source_path.wstring(), target_path.wstring());
+        success &= Extract(func_data, source_path.wstring(), target_path.wstring());
         source_path = source_path.parent_path();
     }
 
     return success;
 }
 
-bool cADFPluginData::ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry& pEntry, std::filesystem::path target_path) {
+bool cADFPluginData::ExtractFile(LPVOID func_data, const AdfEntry& pEntry, std::filesystem::path target_path) {
     std::vector<uint8_t> buffer(pEntry.size, 0);
 
     auto file = adfFileOpen(mAdfVolume.get(), pEntry.name, ADF_FILE_MODE_READ);
@@ -589,10 +586,9 @@ bool cADFPluginData::ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry& pE
     ofile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
     ofile.close();
 
-    DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STEPBYTES, (DWORD_PTR)pEntry.size);
+    DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_STEPBYTES, (DWORD_PTR)pEntry.size);
 
     adfFileClose(file);
-    DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, false, OPUSFILECHANGE_CREATE, lpBatchData->pszDestPath);
     return true;
 }
 
@@ -610,7 +606,17 @@ size_t cADFPluginData::GetTotalSize(const std::wstring& pFile) {
     return mAdfDevice->sizeBlocks;
 }
 
+cADFPluginData::AbortGuard cADFPluginData::SetAbortHandle(HANDLE& hAbortEvent) {
+    return AbortGuard(mAbortEvent, hAbortEvent);
+}
+
+bool cADFPluginData::ShouldAbort() const {
+    return mAbortEvent && WaitForSingleObject(mAbortEvent, 0) == WAIT_OBJECT_0;
+}
+
 uint32_t cADFPluginData::BatchOperation(std::wstring_view path, LPVFSBATCHDATAW lpBatchData) {
+    auto abort_guard = SetAbortHandle(lpBatchData->hAbortEvent);
+
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETPERCENT, (DWORD_PTR)0);
 
     dopus::wstring_view_span entry_names(lpBatchData->pszFiles);
@@ -621,15 +627,15 @@ uint32_t cADFPluginData::BatchOperation(std::wstring_view path, LPVFSBATCHDATAW 
         if (index >= lpBatchData->iNumFiles) break;
 
         if (lpBatchData->uiOperation == VFSBATCHOP_EXTRACT) {
-            lpBatchData->piResults[index] = Extract(lpBatchData, entry_path, lpBatchData->pszDestPath) ? 0 : 1;
+            lpBatchData->piResults[index] = Extract(lpBatchData->lpFuncData, entry_path, lpBatchData->pszDestPath) ? 0 : 1;
         }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_ADD) {
-            lpBatchData->piResults[index] = Import(lpBatchData, path, entry_path);
+            lpBatchData->piResults[index] = Import(lpBatchData->lpFuncData, path, entry_path);
         }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_DELETE) {
-            lpBatchData->piResults[index] = Delete(lpBatchData, path, entry_path);
+            lpBatchData->piResults[index] = Delete(lpBatchData->lpFuncData, path, entry_path);
         }
 
         // Abort on failure.

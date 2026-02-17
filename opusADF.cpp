@@ -5,6 +5,7 @@
 #include <strsafe.h>
 #include <cwctype>
 
+#include "dopus_wstring_view_span.hh"
 #include "stdafx.h"
 #include "text_utils.hh"
 
@@ -312,7 +313,7 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
     return VFSCVRES_FAIL;
 }
 
-int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, const std::wstring& pFile, bool pAll) {
+int cADFPluginData::Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, std::wstring_view pFile, bool pAll) {
     int result = 0;
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Deleting");
     auto adf_file_name = wstring_to_latin1(file_from_path(pFile));
@@ -529,7 +530,7 @@ int cADFPluginData::Import(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile,
     return 0;
 }
 
-int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFile, const std::wstring& pDest) {
+int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pDest) {
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Copying");
 
     // TODO: what does `1` signify? Should we return different error codes for different failure cases?
@@ -544,7 +545,7 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
             return 1;
         }
 
-        std::wstring FinalName = pDest;
+        std::wstring FinalName(pDest);
         if (FinalName[FinalName.size() - 1] != '\\') {
             FinalName += '\\';
         }
@@ -582,14 +583,14 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFi
     return result;
 }
 
-int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPath, const std::wstring& pDest) {
+int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pPath, std::wstring_view pDest) {
     int result = 0;
 
     if (!AdfChangeToPath(pPath)) return result;
 
     auto directory = GetCurrentDirectoryList();
     for (const AdfEntry& entry : directory) {
-        std::wstring FinalPath = pPath;
+        std::wstring FinalPath(pPath);
         if (FinalPath[FinalPath.size() - 1] != '\\')
         {
             FinalPath += '\\';
@@ -646,33 +647,34 @@ size_t cADFPluginData::GetTotalSize(const std::wstring& pFile) {
 uint32_t cADFPluginData::BatchOperation(std::wstring_view path, LPVFSBATCHDATAW lpBatchData) {
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETPERCENT, (DWORD_PTR)0);
 
-    auto result = VFSBATCHRES_COMPLETE;
+    dopus::wstring_view_span files(lpBatchData->pszFiles);
+    int index = 0;
 
-    auto file = lpBatchData->pszFiles;
-
-    for (int i = 0; i < lpBatchData->iNumFiles; ++i) {
+    for (const auto& file : files) {
+        if (file.empty()) break;
+        if (index >= lpBatchData->iNumFiles) break;
 
         if (lpBatchData->uiOperation == VFSBATCHOP_EXTRACT) {
-            lpBatchData->piResults[i] = Extract(lpBatchData, file, lpBatchData->pszDestPath);
+            lpBatchData->piResults[index] = Extract(lpBatchData, file, lpBatchData->pszDestPath);
         }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_ADD) {
-            lpBatchData->piResults[i] = Import(lpBatchData, path, file);
+            lpBatchData->piResults[index] = Import(lpBatchData, path, file);
         }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_DELETE) {
-            lpBatchData->piResults[i] = Delete(lpBatchData, path, file);
+            lpBatchData->piResults[index] = Delete(lpBatchData, path, file);
         }
 
-        if (lpBatchData->piResults[i]) {
-            result = VFSBATCHRES_ABORT;
-            break;
+        // Abort on failure.
+        if (lpBatchData->piResults[index]) {
+            return VFSBATCHRES_ABORT;
         }
 
-        file += wcslen(file) + 1;
+        ++index;
     }
 
-    return result;
+    return VFSBATCHRES_COMPLETE;
 }
 
 bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3) {

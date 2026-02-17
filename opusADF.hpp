@@ -52,7 +52,7 @@ public:
     size_t GetAvailableSize(const std::wstring& pFile);
     size_t GetTotalSize(const std::wstring& pFile);
 
-    int Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, const std::wstring& pFile, bool pAll = false);
+    int Delete(LPVFSBATCHDATAW lpBatchData, std::wstring_view path, std::wstring_view pFile, bool pAll = false);
 
     cADFFindData *FindFirstFile(LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
     bool FindNextFile(cADFFindData* lpRAF, LPWIN32_FIND_DATA lpwfdData);
@@ -62,9 +62,9 @@ public:
     int ImportFile(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath);
     int ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath);
 
-    int Extract(LPVFSBATCHDATAW lpBatchData, const std::wstring& pFile, const std::wstring& pDest);
+    int Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pDest);
     int ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEntry, const std::wstring& pDest);
-    int ExtractPath(LPVFSBATCHDATAW lpBatchData, const std::wstring& pPath, const std::wstring& pDest);
+    int ExtractPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pPath, std::wstring_view pDest);
 
     int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
     uint32_t BatchOperation(std::wstring_view lpszPath, LPVFSBATCHDATAW lpBatchData);

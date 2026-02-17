@@ -63,6 +63,7 @@ set(OPUSADF_SOURCES
 set(OPUSADF_HEADERS
     adf_typed_iterator.hh
     adf_typed_list.hh
+    dopus_wstring_view_span.hh
     opusADF.hpp
     stdafx.h
     text_utils.hh

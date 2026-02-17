@@ -530,19 +530,17 @@ int cADFPluginData::Import(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile,
     return 0;
 }
 
-int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pDest) {
+bool cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pDest) {
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_STATUSTEXT, (DWORD_PTR)"Copying");
 
-    // TODO: what does `1` signify? Should we return different error codes for different failure cases?
-    int result = 1;
-    if (!AdfChangeToPath(pFile, true)) return result;
+    if (!AdfChangeToPath(pFile, true)) return false;
 
     auto want_file_name = file_from_path(pFile);
-
     auto directory = GetCurrentDirectoryList();
+    bool success = true;
     for (const AdfEntry& entry : directory) {
         if (lpBatchData->hAbortEvent && WaitForSingleObject(lpBatchData->hAbortEvent, 0) == WAIT_OBJECT_0) {
-            return 1;
+            return false;
         }
 
         std::wstring FinalName(pDest);
@@ -561,10 +559,10 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile
             // Create a directory, or extract a file?
             if (entry.type == ADF_ST_DIR) {
                 CreateDirectory(FinalName.c_str(), 0);
-                result = ExtractPath(lpBatchData, pFile, FinalName);
+                success &= ExtractPath(lpBatchData, pFile, FinalName);
                 DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, false, OPUSFILECHANGE_CREATE, lpBatchData->pszDestPath);
 
-                if (!result) {
+                if (success) {
                     HANDLE filename = CreateFile(FinalName.c_str(), FILE_WRITE_ATTRIBUTES, 0, 0, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
                     auto entryTime = GetFileTime(entry);
                     SetFileTime(filename, 0, 0, &entryTime);
@@ -572,7 +570,7 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile
                 }
             }
             else {
-                result = ExtractFile(lpBatchData, &entry, FinalName);
+                success &= ExtractFile(lpBatchData, &entry, FinalName);
             }
 
             DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_NEXTFILE, 0);
@@ -580,15 +578,14 @@ int cADFPluginData::Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile
         }
     }
 
-    return result;
+    return success;
 }
 
-int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pPath, std::wstring_view pDest) {
-    int result = 0;
-
-    if (!AdfChangeToPath(pPath)) return result;
+bool cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pPath, std::wstring_view pDest) {
+    if (!AdfChangeToPath(pPath)) return false;
 
     auto directory = GetCurrentDirectoryList();
+    bool success = true;
     for (const AdfEntry& entry : directory) {
         std::wstring FinalPath(pPath);
         if (FinalPath[FinalPath.size() - 1] != '\\')
@@ -598,21 +595,20 @@ int cADFPluginData::ExtractPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view p
         auto Filepath = latin1_to_wstring(entry.name);
         FinalPath += Filepath;
 
-        result |= Extract(lpBatchData, FinalPath, pDest);
+        success &= Extract(lpBatchData, FinalPath, pDest);
     }
 
-    return result;
+    return success;
 }
 
-int cADFPluginData::ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEntry, const std::wstring& pDest) {
+bool cADFPluginData::ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEntry, const std::wstring& pDest) {
     std::string buffer(pEntry->size, 0);
 
-    // TODO: what do `1` and `2` signify? Should we return different error codes for different failure cases?
     auto file = adfFileOpen(mAdfVolume.get(), pEntry->name, ADF_FILE_MODE_READ);
-    if (!file) return 1;
+    if (!file) return false;
 
     auto n = adfFileRead(file, pEntry->size, reinterpret_cast<uint8_t*>(&buffer[0]));
-    if (!n) return 2;
+    if (!n) return false;
 
     std::ofstream ofile(pDest, std::ios::binary);
     ofile.write(buffer.c_str(), buffer.size());
@@ -627,7 +623,7 @@ int cADFPluginData::ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEn
 
     adfFileClose(file);
     DOpus.AddFunctionFileChange(lpBatchData->lpFuncData, false, OPUSFILECHANGE_CREATE, lpBatchData->pszDestPath);
-    return 0;
+    return true;
 }
 
 size_t cADFPluginData::GetAvailableSize(const std::wstring& pFile) {
@@ -655,7 +651,7 @@ uint32_t cADFPluginData::BatchOperation(std::wstring_view path, LPVFSBATCHDATAW 
         if (index >= lpBatchData->iNumFiles) break;
 
         if (lpBatchData->uiOperation == VFSBATCHOP_EXTRACT) {
-            lpBatchData->piResults[index] = Extract(lpBatchData, file, lpBatchData->pszDestPath);
+            lpBatchData->piResults[index] = Extract(lpBatchData, file, lpBatchData->pszDestPath) ? 0 : 1;
         }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_ADD) {

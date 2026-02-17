@@ -62,9 +62,9 @@ public:
     int ImportFile(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath);
     int ImportPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pPath);
 
-    int Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pDest);
-    int ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEntry, const std::wstring& pDest);
-    int ExtractPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pPath, std::wstring_view pDest);
+    bool Extract(LPVFSBATCHDATAW lpBatchData, std::wstring_view pFile, std::wstring_view pDest);
+    bool ExtractFile(LPVFSBATCHDATAW lpBatchData, const AdfEntry* pEntry, const std::wstring& pDest);
+    bool ExtractPath(LPVFSBATCHDATAW lpBatchData, std::wstring_view pPath, std::wstring_view pDest);
 
     int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
     uint32_t BatchOperation(std::wstring_view lpszPath, LPVFSBATCHDATAW lpBatchData);

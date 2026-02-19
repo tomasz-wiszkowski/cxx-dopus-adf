@@ -20,7 +20,7 @@ constexpr bool IsSupportedEntryType(int type) {
 /// @brief Predicate for finding an AdfEntry by name in a directory listing.
 struct AdfFindEntry {
     const std::string name;
-    AdfFindEntry(std::wstring_view name) : name(wstring_to_latin1(name)) {}
+    explicit AdfFindEntry(std::wstring_view name) : name(wstring_to_latin1(name)) {}
 
     bool operator()(const AdfEntry& entry) const {
         return IsSupportedEntryType(entry.type) && name == entry.name;

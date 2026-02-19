@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 4.00)
 project(opusADF VERSION 1.0 LANGUAGES C CXX)
 
 # Set C++ standard
@@ -9,9 +9,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
 # Platform detection
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(PLATFORM_X64 TRUE)
+set(PLATFORM_X64 TRUE)
 else()
     set(PLATFORM_X64 FALSE)
 endif()
@@ -48,14 +51,17 @@ if(NOT EXISTS "${DOPUS_SDK_DIR}/headers")
 endif()
 
 # Add subdirectories
-add_subdirectory(external/adflib)
+# Disable adflib tests to avoid building unnecessary dependencies
+set(ADFLIB_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+set(ADFLIB_ENABLE_SALVAGE_DIRCACHE OFF CACHE BOOL "" FORCE)
+set(ADFLIB_ENABLE_NATIVE_DEV OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/adflib EXCLUDE_FROM_ALL)
 
 
 # Source files
 set(OPUSADF_SOURCES
     dllmain.cpp
     opusADF.cpp
-    stdafx.cpp
     text_utils.cc
 )
 
@@ -88,7 +94,7 @@ else()
 endif()
 
 if (PLATFORM_X64)
-    list(APPEND CPP_DIRECTIVES _WIN64)
+list(APPEND CPP_DIRECTIVES _WIN64)
 else()
     list(APPEND CPP_DIRECTIVES WIN32)
 endif()

@@ -292,3 +292,4 @@ _deps/
 build/
 out/
 .claude/settings.local.json
+graph.dot

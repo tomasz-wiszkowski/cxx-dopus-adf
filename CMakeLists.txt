@@ -103,10 +103,8 @@ if(MSVC)
     target_compile_options(opusADF PRIVATE
         /W4      # Warning level
         /wd4100  # Unreferenced formal parameter
-        # $<$<CONFIG:Debug>:/O1 /Zi /d2Zi+ /Zo /Oy>
+        #$<$<CONFIG:Debug>:/O4 /Zi /d2Zi+ /Zo /Oy>
         $<$<CONFIG:Debug>:/Od>   # Disable optimization for Debug
-        $<$<CONFIG:Release>:/O1> # Optimize for size
-        $<$<CONFIG:Release>:/Oy> # Omit frame pointers
     )
 
     # Conformance mode

@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include "adf_typed_list.hh"
+#include "dopus_wstring_view_span.hh"
 
 namespace adf {
 struct AdfDeviceDeleter {
@@ -13,6 +14,28 @@ struct AdfVolumeDeleter {
 };
 }  // namespace internal
 
+/// @brief Guard object to set and restore fields.
+template <typename T>
+class Guard {
+private:
+    T &old_;
+    T &new_;
+
+public:
+    Guard(T &hold, T &hnew) : old_(hold), new_(hnew) {
+        std::swap(old_, new_);
+    }
+
+    ~Guard() {
+        std::swap(old_, new_);
+    }
+
+    Guard(const Guard &) = delete;
+    Guard &operator=(const Guard &) = delete;
+    Guard(Guard &&) = delete;
+    Guard &operator=(Guard &&) = delete;
+};
+
 class cADFFindData {
 public:
     cADFFindData(AdfTypedList<AdfEntry>&& directory) : mDirectoryList(std::move(directory)), mCurrentEntry(mDirectoryList.begin()) {}
@@ -23,39 +46,19 @@ public:
 };
 
 class cADFPluginData {
-    HINSTANCE				mAdfDll{};
     HANDLE                  mAbortEvent{};
-    size_t                  mLastError{};
     std::filesystem::path   mPath;
+    int                     mLastError{};
 
     std::unique_ptr<AdfDevice, adf::AdfDeviceDeleter> mAdfDevice;
     std::unique_ptr<AdfVolume, adf::AdfVolumeDeleter> mAdfVolume;
 
 private:
-    class AbortGuard {
-      private:
-        HANDLE& old_;
-        HANDLE& new_;
-      public:
-        AbortGuard(HANDLE& hold, HANDLE& hnew) : old_(hold), new_(hnew) {
-            std::swap(old_, new_);
-        }
-
-        AbortGuard(const AbortGuard&) = delete;
-        AbortGuard& operator=(const AbortGuard&) = delete;
-        AbortGuard(AbortGuard&&) = delete;
-        AbortGuard& operator=(AbortGuard&&) = delete;
-
-        ~AbortGuard() {
-            std::swap(old_, new_);
-        }
-    };
-
 protected:
     LPVFSFILEDATAHEADER GetVFSforEntry(const AdfEntry *pEntry, HANDLE pHeap);
     void GetWfdForEntry(const AdfEntry &entry, LPWIN32_FIND_DATA pData);
 
-    AbortGuard SetAbortHandle(HANDLE& hAbortEvent);
+    Guard<HANDLE> SetAbortHandle(HANDLE& hAbortEvent);
     bool ShouldAbort() const;
 
     FILETIME            GetFileTime(const AdfEntry &entry);
@@ -82,6 +85,8 @@ public:
     bool FindNextFile(cADFFindData* lpRAF, LPWIN32_FIND_DATA lpwfdData);
     void FindClose(cADFFindData* lpRAF);
 
+    LPVFSFILEDATAHEADER GetfileInformation(std::wstring_view path, HANDLE heap);
+
     int Import(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath);
     int ImportFile(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath);
     int ImportPath(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath);
@@ -89,8 +94,10 @@ public:
     bool Extract(LPVOID func_data, std::filesystem::path source_path, std::filesystem::path target_path);
     bool ExtractFile(LPVOID func_data, const AdfEntry& pEntry, std::filesystem::path target_path);
     bool ExtractPath(LPVOID func_data, std::filesystem::path source_path, std::filesystem::path target_path);
+    bool ExtractEntries(LPVOID func_data, dopus::wstring_view_span entry_names, std::wstring_view target_path);
 
     int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
     uint32_t BatchOperation(std::wstring_view lpszPath, LPVFSBATCHDATAW lpBatchData);
     bool PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
+    int GetLastError() const { return mLastError; }
 };

@@ -109,6 +109,17 @@ void cADFPluginData::SetEntryTime(AdfFile *pFile, FILETIME pFT) {
     adfTime2AmigaTime(dt, &(pFile->fileHdr->days), &(pFile->fileHdr->mins), &(pFile->fileHdr->ticks));
 }
 
+LPVFSFILEDATAHEADER cADFPluginData::GetfileInformation(std::wstring_view path, HANDLE heap) {
+    mLastError = ERROR_FILE_NOT_FOUND;
+    if (!AdfChangeToPath(path, true)) return nullptr;
+    auto filename = file_from_path(path);
+    auto directory = GetCurrentDirectoryList();
+    auto iter = std::ranges::find_if(directory, AdfFindEntry(filename));
+    if (iter == directory.end()) return nullptr;
+    mLastError = 0;
+    return GetVFSforEntry(&*iter, heap);
+}
+
 LPVFSFILEDATAHEADER cADFPluginData::GetVFSforEntry(const AdfEntry *pEntry, HANDLE pHeap) {
     LPVFSFILEDATAHEADER lpFDH;
 
@@ -168,7 +179,7 @@ bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) 
 
         // No matching entry found for this component, path is invalid.
         if (entry == directory.end()) return false;
-        adfChangeDir(mAdfVolume.get(), entry->name);
+        if (!adfChangeDir(mAdfVolume.get(), entry->name)) return false;
     }
 
     return true;
@@ -279,10 +290,10 @@ bool cADFPluginData::ReadFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD
 }
 
 AdfFile* cADFPluginData::OpenFile(std::wstring pPath) {
-    if (!AdfChangeToPath(pPath)) return nullptr;
+    if (!AdfChangeToPath(pPath, true)) return nullptr;
 
-    auto filename = wstring_to_latin1(file_from_path(pPath));
-    return adfFileOpen(mAdfVolume.get(), filename.c_str(), ADF_FILE_MODE_READ);
+    auto filename = file_from_path(pPath);
+    return adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename).data(), ADF_FILE_MODE_READ);
 }
 
 void cADFPluginData::CloseFile(AdfFile* pFile) {
@@ -300,17 +311,13 @@ AdfTypedList<AdfEntry> cADFPluginData::GetCurrentDirectoryList() {
 int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
     if (!AdfChangeToPath(lpVerbData->lpszPath, true)) return VFSCVRES_FAIL;
 
-    auto want_file_name = wstring_to_latin1(file_from_path(lpVerbData->lpszPath));
+    auto want_file_name = file_from_path(lpVerbData->lpszPath);
     auto directory = GetCurrentDirectoryList();
 
-    for (const AdfEntry& entry : directory) {
-        if (want_file_name != entry.name) continue;
-
-        if (entry.type == ADF_ST_FILE) return VFSCVRES_EXTRACT;
-        if (entry.type == ADF_ST_DIR) return VFSCVRES_DEFAULT;
-    }
-
-    return VFSCVRES_FAIL;
+    auto iter = std::ranges::find_if(directory, AdfFindEntry(want_file_name));
+    if (iter == directory.end()) return VFSCVRES_FAIL;
+    if (iter->type == ADF_ST_FILE) return VFSCVRES_EXTRACT;
+    return VFSCVRES_DEFAULT;
 }
 
 int cADFPluginData::Delete(LPVOID func_data, std::wstring_view path, std::wstring_view pFile, bool pAll) {
@@ -319,7 +326,7 @@ int cADFPluginData::Delete(LPVOID func_data, std::wstring_view path, std::wstrin
     auto adf_file_name = wstring_to_latin1(file_from_path(pFile));
 
     // TODO: magic numbers
-    if (!AdfChangeToPath(path)) return 0;
+    if (!AdfChangeToPath(path, true)) return 0;
 
     auto directory = GetCurrentDirectoryList();
     for (const AdfEntry& entry : directory) {
@@ -388,7 +395,10 @@ bool cADFPluginData::FindNextFile(cADFFindData* pFindData, LPWIN32_FIND_DATA lpw
         if (IsSupportedEntryType(iter->type) && std::regex_match(iter->name, pattern)) break;
     }
 
-    if (iter == directory.end()) return false;
+    if (iter == directory.end()) {
+        mLastError = ERROR_NO_MORE_FILES;
+        return false;
+    }
     GetWfdForEntry(*iter, lpwfdData);
     ++iter;
     return true;
@@ -606,8 +616,8 @@ size_t cADFPluginData::GetTotalSize(const std::wstring& pFile) {
     return mAdfDevice->sizeBlocks;
 }
 
-cADFPluginData::AbortGuard cADFPluginData::SetAbortHandle(HANDLE& hAbortEvent) {
-    return AbortGuard(mAbortEvent, hAbortEvent);
+Guard<HANDLE> cADFPluginData::SetAbortHandle(HANDLE& hAbortEvent) {
+    return Guard<HANDLE>(mAbortEvent, hAbortEvent);
 }
 
 bool cADFPluginData::ShouldAbort() const {
@@ -616,6 +626,12 @@ bool cADFPluginData::ShouldAbort() const {
 
 uint32_t cADFPluginData::BatchOperation(std::wstring_view path, LPVFSBATCHDATAW lpBatchData) {
     auto abort_guard = SetAbortHandle(lpBatchData->hAbortEvent);
+    memset(lpBatchData->piResults, 0, sizeof(int) * lpBatchData->iNumFiles);
+
+    if (lpBatchData->uiOperation == VFSBATCHOP_EXTRACT) {
+        // TODO: maybe pass piResults, too.
+        return ExtractEntries(lpBatchData->lpFuncData, dopus::wstring_view_span(lpBatchData->pszFiles), lpBatchData->pszDestPath) ? VFSBATCHRES_COMPLETE : VFSBATCHRES_ABORT;
+    }
 
     DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETPERCENT, (DWORD_PTR)0);
 
@@ -623,12 +639,10 @@ uint32_t cADFPluginData::BatchOperation(std::wstring_view path, LPVFSBATCHDATAW 
     int index = 0;
 
     for (const auto& entry_path : entry_names) {
+        // TODO: batch operation seems to rely on buildingblocks, like the ExtractEntries function.
+        // Investigate the VFS API and see if we should adopt this here, too.
         if (entry_path.empty()) break;
         if (index >= lpBatchData->iNumFiles) break;
-
-        if (lpBatchData->uiOperation == VFSBATCHOP_EXTRACT) {
-            lpBatchData->piResults[index] = Extract(lpBatchData->lpFuncData, entry_path, lpBatchData->pszDestPath) ? 0 : 1;
-        }
 
         if (lpBatchData->uiOperation == VFSBATCHOP_ADD) {
             lpBatchData->piResults[index] = Import(lpBatchData->lpFuncData, path, entry_path);
@@ -650,20 +664,77 @@ uint32_t cADFPluginData::BatchOperation(std::wstring_view path, LPVFSBATCHDATAW 
 }
 
 bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3) {
+    switch (propId) {
+        case VFSPROP_ALLOWTOOLTIPGETSIZES:
+        case VFSPROP_CANSHOWSUBFOLDERS:
+        case VFSPROP_SHOWTHUMBNAILS:
+        case VFSPROP_SUPPORTFILEHASH:
+        case VFSPROP_SUPPORTPATHCOMPLETION:
+        case VFSPROP_ISEXTRACTABLE:
+            *((LPBOOL)lpPropData) = true;
+            break;
 
-    if (propId == VFSPROP_SHOWTHUMBNAILS) {
+        case VFSPROP_CANDELETESECURE:
+        case VFSPROP_CANDELETETOTRASH:
+        case VFSPROP_SHOWFILEINFO:
+        case VFSPROP_USEFULLRENAME:
+            *((LPBOOL)lpPropData) = false;
+            break;
 
-        *(bool*)lpPropData = true;
+        case VFSPROP_SHOWPICTURESDIRECTLY:
+        case VFSPROP_SHOWFULLPROGRESSBAR: // No progress bar even when copying.
+            *((LPDWORD)lpPropData) = false;
+            break;
 
-        return true;
+        case VFSPROP_DRAGEFFECTS:
+            *((LPDWORD)lpPropData) = DROPEFFECT_COPY;
+            break;
+
+        case VFSPROP_BATCHOPERATION:
+            *((LPDWORD)lpPropData) = VFSBATCHRES_HANDLED;
+            break;
+
+        case VFSPROP_GETVALIDACTIONS:
+            *((LPDWORD)lpPropData) = /* SFGAO_*/ 0;
+            break;
+
+        case VFSPROP_COPYBUFFERSIZE:
+            *((LPDWORD)lpPropData) = 64 << 10;
+            break;
+
+        case VFSPROP_FUNCAVAILABILITY:
+            *((LPDWORD)lpPropData) &= ~(VFSFUNCAVAIL_MOVE | VFSFUNCAVAIL_DELETE
+                                        // | VFSFUNCAVAIL_GETSIZES
+                                        | VFSFUNCAVAIL_MAKEDIR | VFSFUNCAVAIL_PRINT | VFSFUNCAVAIL_PROPERTIES | VFSFUNCAVAIL_RENAME | VFSFUNCAVAIL_SETATTR | VFSFUNCAVAIL_SHORTCUT
+                                        //| VFSFUNCAVAIL_SELECTALL
+                                        //| VFSFUNCAVAIL_SELECTNONE
+                                        //| VFSFUNCAVAIL_SELECTINVERT
+                                        | VFSFUNCAVAIL_VIEWLARGEICONS | VFSFUNCAVAIL_VIEWSMALLICONS
+                                        //| VFSFUNCAVAIL_VIEWLIST
+                                        | VFSFUNCAVAIL_VIEWDETAILS
+                                        | VFSFUNCAVAIL_VIEWTHUMBNAIL | VFSFUNCAVAIL_CLIPCOPY | VFSFUNCAVAIL_CLIPCUT | VFSFUNCAVAIL_CLIPPASTE | VFSFUNCAVAIL_CLIPPASTESHORTCUT | VFSFUNCAVAIL_UNDO
+                                        //| VFSFUNCAVAIL_SHOW
+                                        | VFSFUNCAVAIL_DUPLICATE | VFSFUNCAVAIL_SPLITJOIN
+                                        //| VFSFUNCAVAIL_SELECTRESELECT
+                                        //| VFSFUNCAVAIL_SELECTALLFILES
+                                        //| VFSFUNCAVAIL_SELECTALLDIRS
+                                        //| VFSFUNCAVAIL_PLAY
+                                        | VFSFUNCAVAIL_SETTIME | VFSFUNCAVAIL_VIEWTILE | VFSFUNCAVAIL_SETCOMMENT);
+            break;
+
+            // VFSPROP_GETFOLDERICON -> return icon file?
+        default:
+            return false;
     }
 
-    if (propId == VFSPROP_FUNCAVAILABILITY) {
-        unsigned __int64* Data = (unsigned __int64*)lpPropData;
+    return true;
+}
 
-        *Data &= ~(VFSFUNCAVAIL_DELETE | VFSFUNCAVAIL_MAKEDIR | VFSFUNCAVAIL_RENAME | VFSFUNCAVAIL_SETATTR | VFSFUNCAVAIL_CLIPCUT | VFSFUNCAVAIL_CLIPPASTE | VFSFUNCAVAIL_CLIPPASTESHORTCUT | VFSFUNCAVAIL_DUPLICATE);
-        return true;
+bool cADFPluginData::ExtractEntries(LPVOID func_data, dopus::wstring_view_span entry_names, std::wstring_view target_path) {
+    for (const auto& entry_path : entry_names) {
+        if (entry_path.empty()) break;
+        if (!Extract(func_data, entry_path, target_path)) return false;
     }
 
-    return false;
+    return true;
 }

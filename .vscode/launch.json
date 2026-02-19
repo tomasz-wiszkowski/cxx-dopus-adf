@@ -10,6 +10,16 @@
             "request": "attach",
             "processId": "${command:pickProcess}",
             "symbolSearchPath": ""
+        },
+        {
+            "name": "Launch DOpus",
+            "request": "launch",
+            "type":"cppvsdbg",
+            "program": "C:\\Program Files\\GPSoftware\\Directory Opus\\dopus.exe",
+            "args": [],
+            "cwd": "C:\\Program Files\\GPSoftware\\Directory Opus",
+            "stopAtEntry": false,
+            "environment": []
         }
     ]
 }

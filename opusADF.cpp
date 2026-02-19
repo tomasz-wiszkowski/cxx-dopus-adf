@@ -179,7 +179,7 @@ bool cADFPluginData::AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast) 
 
         // No matching entry found for this component, path is invalid.
         if (entry == directory.end()) return false;
-        if (!adfChangeDir(mAdfVolume.get(), entry->name)) return false;
+        if (adfChangeDir(mAdfVolume.get(), entry->name) != ADF_RC_OK) return false;
     }
 
     return true;

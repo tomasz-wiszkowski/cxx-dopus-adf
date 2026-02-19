@@ -22,7 +22,8 @@ std::filesystem::path wstring_to_path(std::wstring_view wide);
 
 /// @brief Split a path string into its components
 /// @param path Input string to split
-/// @param relative_to Optional base path to make the split relative to. If empty, the split is absolute.
+/// @param relative_to Optional base path to make the split relative to. If
+/// empty, the split is absolute.
 /// @return Vector of string views representing the split parts
 std::vector<std::wstring_view> split_path_to_components(std::wstring_view path, std::wstring_view relative_to = L"");
 

@@ -3,6 +3,7 @@
 BasedOnStyle: Chromium
 Language: Cpp
 Standard: c++17
+ColumnLimit: 120
 
 InsertBraces: false
 InsertNewlineAtEOF: true

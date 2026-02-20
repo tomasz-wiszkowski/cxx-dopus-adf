@@ -5,5 +5,6 @@
   "clang-tidy.buildPath": ".",
   "C_Cpp.default.compileCommands": "${workspaceFolder}/build/ninja-x64-debug/compile_commands.json",
   "C_Cpp.codeAnalysis.clangTidy.enabled": true,
-  "C_Cpp.codeAnalysis.runAutomatically": true
+  "C_Cpp.codeAnalysis.runAutomatically": true,
+  "editor.tabSize": 2
 }

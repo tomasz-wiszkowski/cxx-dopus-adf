@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 
 #include "adf_typed_list.hh"
 #include "dopus_wstring_view_span.hh"
@@ -41,7 +42,7 @@ class cADFFindData {
 
   AdfTypedList<AdfEntry> mDirectoryList;
   AdfTypedIterator<AdfEntry> mCurrentEntry;
-  std::regex mFindMask;
+  std::optional<std::regex> mPattern;
 };
 
 class cADFPluginData {
@@ -63,40 +64,40 @@ class cADFPluginData {
   FILETIME GetFileTime(const AdfEntry& entry);
   void SetEntryTime(AdfFile* pFile, FILETIME pFT);
 
-  bool LoadFile(std::wstring_view pAfPath);
+  std::optional<std::filesystem::path> LoadFile(const std::filesystem::path& pAfPath);
   AdfTypedList<AdfEntry> GetCurrentDirectoryList();
 
  public:
-  bool AdfChangeToPath(std::wstring_view pPath, bool pIgnoreLast = false);
+  bool AdfChangeToPath(std::filesystem::path path, bool pIgnoreLast = false);
 
   bool ReadDirectory(LPVFSREADDIRDATAW lpRDD);
   bool ReadFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD readSize);
 
-  AdfFile* OpenFile(std::wstring pPath);
+  AdfFile* OpenFile(std::filesystem::path path);
   void CloseFile(AdfFile* pFile);
 
-  size_t GetAvailableSize(const std::wstring& pFile);
-  size_t GetTotalSize(const std::wstring& pFile);
+  size_t GetAvailableSize();
+  size_t GetTotalSize();
 
-  int Delete(LPVOID func_data, std::wstring_view path, std::wstring_view pFile, bool pAll = false);
+  int Delete(LPVOID func_data, std::filesystem::path path, std::filesystem::path pFile, bool pAll = false);
 
-  cADFFindData* FindFirstFile(LPWSTR lpszPath, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
+  cADFFindData* FindFirstFile(std::filesystem::path path, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
   bool FindNextFile(cADFFindData* lpRAF, LPWIN32_FIND_DATA lpwfdData);
   void FindClose(cADFFindData* lpRAF);
 
-  LPVFSFILEDATAHEADER GetfileInformation(std::wstring_view path, HANDLE heap);
+  LPVFSFILEDATAHEADER GetfileInformation(std::filesystem::path path, HANDLE heap);
 
-  int Import(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath);
-  int ImportFile(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath);
-  int ImportPath(LPVOID func_data, std::wstring_view pFile, std::wstring_view pPath);
+  int Import(LPVOID func_data, std::filesystem::path file, std::filesystem::path path);
+  int ImportFile(LPVOID func_data, std::filesystem::path file, std::filesystem::path path);
+  int ImportPath(LPVOID func_data, std::filesystem::path file, std::filesystem::path path);
 
   bool Extract(LPVOID func_data, std::filesystem::path source_path, std::filesystem::path target_path);
   bool ExtractFile(LPVOID func_data, const AdfEntry& pEntry, std::filesystem::path target_path);
   bool ExtractPath(LPVOID func_data, std::filesystem::path source_path, std::filesystem::path target_path);
-  bool ExtractEntries(LPVOID func_data, dopus::wstring_view_span entry_names, std::wstring_view target_path);
+  bool ExtractEntries(LPVOID func_data, dopus::wstring_view_span entry_names, std::filesystem::path target_path);
 
   int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
-  uint32_t BatchOperation(std::wstring_view lpszPath, LPVFSBATCHDATAW lpBatchData);
+  uint32_t BatchOperation(std::filesystem::path lpszPath, LPVFSBATCHDATAW lpBatchData);
   bool PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
   int GetLastError() const { return mLastError; }
 };

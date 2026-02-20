@@ -171,12 +171,13 @@ bool VFS_GetFreeDiskSpaceW(cADFPluginData* hData,
                            uint64_t* piFreeBytesAvailable,
                            uint64_t* piTotalBytes,
                            uint64_t* piTotalFreeBytes) {
+  hData->AdfChangeToPath(lpszPath);
   if (piFreeBytesAvailable)
-    *piFreeBytesAvailable = hData->GetAvailableSize(lpszPath);
+    *piFreeBytesAvailable = hData->GetAvailableSize();
   if (piTotalFreeBytes)
-    *piTotalFreeBytes = hData->GetAvailableSize(lpszPath);
+    *piTotalFreeBytes = hData->GetAvailableSize();
   if (piTotalBytes)
-    *piTotalBytes = hData->GetTotalSize(lpszPath);
+    *piTotalBytes = hData->GetTotalSize();
 
   return true;
 }

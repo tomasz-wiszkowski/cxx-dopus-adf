@@ -57,7 +57,7 @@ __declspec(dllexport) cADFFindData* WINAPI VFS_FindFirstFileW(cADFPluginData* hD
                                                               LPWSTR lpszPath,
                                                               LPWIN32_FIND_DATA lpwfdData,
                                                               HANDLE hAbortEvent);
-__declspec(dllexport) bool WINAPI VFS_FindNextFileW(cADFPluginData* hData,
+__declspec(dllexport) BOOL WINAPI VFS_FindNextFileW(cADFPluginData* hData,
                                                     LPVFSFUNCDATA lpVFSData,
                                                     cADFFindData* hFind,
                                                     LPWIN32_FIND_DATA lpwfdData);
@@ -187,20 +187,18 @@ cADFFindData* VFS_FindFirstFileW(cADFPluginData* hData,
                                  LPWSTR lpszPath,
                                  LPWIN32_FIND_DATA lpwfdData,
                                  HANDLE hAbortEvent) {
-  return (hData) ? hData->FindFirstFile(lpszPath, lpwfdData, hAbortEvent)
-                 : reinterpret_cast<cADFFindData*>(INVALID_HANDLE_VALUE);
+  return hData->FindFirstFile(lpszPath, lpwfdData, hAbortEvent);
 }
 
-bool VFS_FindNextFileW(cADFPluginData* hData,
+BOOL VFS_FindNextFileW(cADFPluginData* hData,
                        LPVFSFUNCDATA lpVFSData,
                        cADFFindData* hFind,
                        LPWIN32_FIND_DATA lpwfdData) {
-  return (hData && hFind) ? hData->FindNextFile(hFind, lpwfdData) : false;
+  return hData->FindNextFile(hFind, lpwfdData);
 }
 
 void VFS_FindClose(cADFPluginData* hData, cADFFindData* hFind) {
-  if (hData && hFind)
-    hData->FindClose(hFind);
+  hData->FindClose(hFind);
 }
 
 BOOL VFS_ExtractFilesW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSEXTRACTFILESDATA lpExtractData) {
@@ -209,7 +207,7 @@ BOOL VFS_ExtractFilesW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSEXT
 }
 
 long VFS_GetLastError(cADFPluginData* data) {
-  return data->GetLastError();
+  return data->GetError();
 }
 
 LPVFSFILEDATAHEADER VFS_GetFileInformationW(cADFPluginData* data,

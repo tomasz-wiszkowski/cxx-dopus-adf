@@ -4,7 +4,6 @@
 #include <strsafe.h>
 
 #include <cwctype>
-#include <filesystem>
 
 #include "dopus_wstring_view_span.hh"
 #include "stdafx.h"
@@ -109,7 +108,7 @@ void cADFPluginData::SetEntryTime(AdfFile* pFile, FILETIME pFT) {
 }
 
 LPVFSFILEDATAHEADER cADFPluginData::GetfileInformation(std::filesystem::path path, HANDLE heap) {
-  mLastError = ERROR_FILE_NOT_FOUND;
+  SetError(ERROR_FILE_NOT_FOUND);
   if (!AdfChangeToPath(path, true))
     return nullptr;
   auto filename = path.filename().wstring();
@@ -117,7 +116,7 @@ LPVFSFILEDATAHEADER cADFPluginData::GetfileInformation(std::filesystem::path pat
   auto iter = std::ranges::find_if(directory, AdfFindEntry(filename));
   if (iter == directory.end())
     return nullptr;
-  mLastError = 0;
+  SetError(0);
   return GetVFSforEntry(&*iter, heap);
 }
 
@@ -239,13 +238,14 @@ std::optional<std::filesystem::path> cADFPluginData::LoadFile(const std::filesys
 
   auto utf_file_path = real_file_path.string();
 
-  mAdfDevice.reset(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READONLY));
-  if (!mAdfDevice)
-    return {};
+  bool allow_rw = true;
+  mAdfDevice.reset(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READWRITE));
+  if (!mAdfDevice) mAdfDevice.reset(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READONLY));
+  if (!mAdfDevice) return {};
 
   adfDevMount(mAdfDevice.get());
 
-  mAdfVolume.reset(adfVolMount(mAdfDevice.get(), 0, ADF_ACCESS_MODE_READONLY));
+  mAdfVolume.reset(adfVolMount(mAdfDevice.get(), 0, allow_rw ? ADF_ACCESS_MODE_READWRITE : ADF_ACCESS_MODE_READONLY));
   if (!mAdfVolume) {
     mAdfDevice.reset();
     return {};
@@ -267,7 +267,7 @@ bool cADFPluginData::ReadDirectory(LPVFSREADDIRDATAW lpRDD) {
 
   // Do nothing if we have no path
   if (!lpRDD->lpszPath || !*lpRDD->lpszPath) {
-    mLastError = ERROR_PATH_NOT_FOUND;
+    SetError(ERROR_PATH_NOT_FOUND);
     return false;
   }
 
@@ -343,33 +343,39 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
   return VFSCVRES_DEFAULT;
 }
 
-int cADFPluginData::Delete(LPVOID func_data, std::filesystem::path path, std::filesystem::path pFile, bool pAll) {
-  int result = 0;
+bool cADFPluginData::Delete(LPVOID func_data, std::filesystem::path path, std::set<std::filesystem::path> files, bool pAll) {
+  SetError(0);
+  if (!AdfChangeToPath(path))
+    return false;
+
   DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_STATUSTEXT, reinterpret_cast<DWORD_PTR>("Deleting"));
-  auto adf_file_name = wstring_to_latin1(pFile.filename().wstring());
+  // Transform all strings to latin1
+  std::set<std::string> adf_files;
+  std::ranges::transform(files, std::inserter(adf_files, adf_files.end()), [](auto path) {
+    if (!path.has_filename()) path = path.parent_path();
+    return wstring_to_latin1(path.filename().wstring());
+  });
 
-  // TODO: magic numbers
-  if (!AdfChangeToPath(path, true))
-    return 0;
-
+  bool success = true;
+  bool files_deleted = false;
   auto directory = GetCurrentDirectoryList();
   for (const AdfEntry& entry : directory) {
-    // TODO: magic numbers
-    if (ShouldAbort())
-      return 1;
+    if (ShouldAbort()) return false;
 
-    // Entry match?
-    if (pAll || adf_file_name == entry.name) {
+    if (pAll || adf_files.contains(entry.name)) {
+      files_deleted = true;
+      auto filename = latin1_to_wstring(entry.name);
+      auto full_file_name = path / filename;
       if (entry.type == ADF_ST_DIR) {
-        auto filename = latin1_to_wstring(entry.name);
-        result |= Delete(func_data, path / filename, pFile, pAll);
+        success &= Delete(func_data, full_file_name, {}, true);
+        AdfChangeToPath(path);
       }
-      AdfChangeToPath(path);
-      result |= adfRemoveEntry(mAdfVolume.get(), entry.parent, entry.name);
+      success &= (adfRemoveEntry(mAdfVolume.get(), entry.parent, entry.name) == ADF_RC_OK);
     }
   }
 
-  return result;
+  if (files_deleted) DOpus.AddFunctionFileChange(func_data, /* fIsDest= */ FALSE, OPUSFILECHANGE_REFRESH, path.wstring().data());
+  return success;
 }
 
 cADFFindData* cADFPluginData::FindFirstFile(std::filesystem::path path, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent) {
@@ -382,8 +388,7 @@ cADFFindData* cADFPluginData::FindFirstFile(std::filesystem::path path, LPWIN32_
     find_data->mPattern = std::regex("(" + pattern + ")");
   }
 
-  if (!FindNextFile(find_data.get(), lpwfdData))
-    find_data.reset();
+  if (!FindNextFile(find_data.get(), lpwfdData)) find_data.reset();
 
   return find_data.release();
 }
@@ -399,7 +404,7 @@ bool cADFPluginData::FindNextFile(cADFFindData* pFindData, LPWIN32_FIND_DATA lpw
   }
 
   if (iter == directory.end()) {
-    mLastError = ERROR_NO_MORE_FILES;
+    SetError(ERROR_NO_MORE_FILES);
     return false;
   }
   GetWfdForEntry(*iter, lpwfdData);
@@ -613,17 +618,20 @@ uint32_t cADFPluginData::BatchOperation(std::filesystem::path path, LPVFSBATCHDA
   auto abort_guard = SetAbortHandle(lpBatchData->hAbortEvent);
   memset(lpBatchData->piResults, 0, sizeof(int) * lpBatchData->iNumFiles);
 
+  dopus::wstring_view_span entry_names(lpBatchData->pszFiles);
+
   if (lpBatchData->uiOperation == VFSBATCHOP_EXTRACT) {
     // TODO: maybe pass piResults, too.
-    return ExtractEntries(lpBatchData->lpFuncData, dopus::wstring_view_span(lpBatchData->pszFiles),
-                          lpBatchData->pszDestPath)
+    return ExtractEntries(lpBatchData->lpFuncData, entry_names, lpBatchData->pszDestPath)
                ? VFSBATCHRES_COMPLETE
                : VFSBATCHRES_ABORT;
+  } else if (lpBatchData->uiOperation == VFSBATCHOP_DELETE) {
+    std::set<std::filesystem::path> entries_to_delete(entry_names.begin(), entry_names.end());
+    return Delete(lpBatchData->lpFuncData, path, std::move(entries_to_delete)) ? VFSBATCHRES_COMPLETE : VFSBATCHRES_ABORT;
   }
 
   DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETPERCENT, (DWORD_PTR)0);
 
-  dopus::wstring_view_span entry_names(lpBatchData->pszFiles);
   int index = 0;
 
   for (const auto& entry_path : entry_names) {
@@ -638,9 +646,6 @@ uint32_t cADFPluginData::BatchOperation(std::filesystem::path path, LPVFSBATCHDA
       lpBatchData->piResults[index] = Import(lpBatchData->lpFuncData, path, entry_path);
     }
 
-    if (lpBatchData->uiOperation == VFSBATCHOP_DELETE) {
-      lpBatchData->piResults[index] = Delete(lpBatchData->lpFuncData, path, entry_path);
-    }
 
     // Abort on failure.
     if (lpBatchData->piResults[index]) {
@@ -694,8 +699,8 @@ bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpDat
 
     case VFSPROP_FUNCAVAILABILITY:
       *reinterpret_cast<LPDWORD>(lpPropData) &=
-          ~(VFSFUNCAVAIL_MOVE |
-            VFSFUNCAVAIL_DELETE
+          ~(VFSFUNCAVAIL_MOVE
+            // | VFSFUNCAVAIL_DELETE
             // | VFSFUNCAVAIL_GETSIZES
             | VFSFUNCAVAIL_MAKEDIR | VFSFUNCAVAIL_PRINT | VFSFUNCAVAIL_PROPERTIES | VFSFUNCAVAIL_RENAME |
             VFSFUNCAVAIL_SETATTR |
@@ -738,4 +743,9 @@ bool cADFPluginData::ExtractEntries(LPVOID func_data,
   }
 
   return true;
+}
+
+void cADFPluginData::SetError(int error) {
+  mLastError = error;
+  ::SetLastError(error);
 }

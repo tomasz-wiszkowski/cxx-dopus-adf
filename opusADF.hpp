@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <set>
 
 #include "adf_typed_list.hh"
 #include "dopus_wstring_view_span.hh"
@@ -66,6 +67,7 @@ class cADFPluginData {
 
   std::optional<std::filesystem::path> LoadFile(const std::filesystem::path& pAfPath);
   AdfTypedList<AdfEntry> GetCurrentDirectoryList();
+  void SetError(int error);
 
  public:
   bool AdfChangeToPath(std::filesystem::path path, bool pIgnoreLast = false);
@@ -79,7 +81,7 @@ class cADFPluginData {
   size_t GetAvailableSize();
   size_t GetTotalSize();
 
-  int Delete(LPVOID func_data, std::filesystem::path path, std::filesystem::path pFile, bool pAll = false);
+  bool Delete(LPVOID func_data, std::filesystem::path path, std::set<std::filesystem::path> files, bool pAll = false);
 
   cADFFindData* FindFirstFile(std::filesystem::path path, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent);
   bool FindNextFile(cADFFindData* lpRAF, LPWIN32_FIND_DATA lpwfdData);
@@ -99,5 +101,5 @@ class cADFPluginData {
   int ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData);
   uint32_t BatchOperation(std::filesystem::path lpszPath, LPVFSBATCHDATAW lpBatchData);
   bool PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpData1, LPVOID lpData2, LPVOID lpData3);
-  int GetLastError() const { return mLastError; }
+  int GetError() const { return mLastError; }
 };

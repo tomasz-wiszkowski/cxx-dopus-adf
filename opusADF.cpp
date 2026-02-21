@@ -432,30 +432,22 @@ void cADFPluginData::FindClose(cADFFindData* pFindData) {
   delete pFindData;
 }
 
-int cADFPluginData::ImportFile(LPVOID func_data, std::filesystem::path pFile, std::filesystem::path path) {
+int cADFPluginData::ImportFile(LPVOID func_data, std::filesystem::path destination, std::filesystem::path source) {
+  auto filename = source.filename();
+  DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.wstring().data());
+  DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_NOPROGRESS, true);
+
   // TODO: Handle file read errors
   // TODO: Don't read the entire file into memory at once
-  std::ifstream t(path.native(), std::ios::binary);
+  std::ifstream t(source.native(), std::ios::binary);
   std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-
-  auto filename = path.filename();
-
-  DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILENAME, (DWORD_PTR)filename.string().data());
   DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)buffer.size());
 
-  FILETIME ft;
-  {
-    HANDLE file =
-        CreateFile(path.native().data(), FILE_READ_ATTRIBUTES, 0, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-    ::GetFileTime(file, nullptr, nullptr, &ft);
-    CloseHandle(file);
-  }
 
   auto file = adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename.wstring()).data(), ADF_FILE_MODE_WRITE);
   if (!file)
     return 1;
 
-  SetEntryTime(file, ft);
   adfFileWrite(file, static_cast<int32_t>(buffer.size()), buffer.data());
   adfFileClose(file);
 
@@ -490,50 +482,44 @@ std::vector<std::wstring> directoryList(std::filesystem::path path) {
   return results;
 }
 
-int cADFPluginData::ImportPath(LPVOID func_data, std::filesystem::path pFile, std::filesystem::path pPath) {
-  auto sys_file_name = pPath.filename().wstring();
-  auto adf_file_name = wstring_to_latin1(sys_file_name);
+int cADFPluginData::ImportPath(LPVOID func_data, std::filesystem::path destination, std::filesystem::path source) {
+  auto adf_file_name = wstring_to_latin1(source.filename().wstring());
 
   // TODO: check return codes?
   adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, adf_file_name.data());
+  adfChangeDir(mAdfVolume.get(), adf_file_name.data());
+  destination /= source.filename();
 
-  auto directory = GetCurrentDirectoryList();
-  for (const AdfEntry& entry : directory) {
-    if (adf_file_name != entry.name)
+  auto contents = directoryList(source / "*.*");
+  for (auto& file : contents) {
+    if (file == L"." || file == L"..")
       continue;
 
-    auto contents = directoryList(pFile / "*.*");
-
-    for (auto& file : contents) {
-      if (file == L"." || file == L"..")
-        continue;
-
-      Import(func_data, pPath / file, pFile / file);
-    }
+    Import(func_data, destination, source / file);
   }
 
+  adfParentDir(mAdfVolume.get());
   return 0;
 }
 
-int cADFPluginData::Import(LPVOID func_data, std::filesystem::path pFile, std::filesystem::path pPath) {
+int cADFPluginData::Import(LPVOID func_data, std::filesystem::path destination, std::filesystem::path source) {
   // TODO: magic numbers
-  if (!AdfChangeToPath(pFile, false))
+  if (!AdfChangeToPath(destination, false))
     return 0;
 
   if (ShouldAbort())
     return 1;
 
-  // is pPath a directory?
-  auto Attribs = GetFileAttributesW(pPath.wstring().data());
+  destination = sanitize(std::move(destination));
+  source = sanitize(std::move(source));
 
-  if (Attribs & FILE_ATTRIBUTE_DIRECTORY)
-    ImportPath(func_data, pFile, pPath);
-  else {
-    ImportFile(func_data, pFile, pPath);
+  if (std::filesystem::is_directory(source)) {
+    ImportPath(func_data, destination, source);
+  } else {
+    ImportFile(func_data, destination, source);
   }
 
-  // TODO: why 0? is that a success or failure? if success, then the AdfChangeToPath failure above should probably
-  // return a different code, and if failure, then we should return a different code here too. Investigate.
+  DOpus.AddFunctionFileChange(func_data, /* fIsDest= */ TRUE, OPUSFILECHANGE_REFRESH, destination.wstring().data());
   return 0;
 }
 

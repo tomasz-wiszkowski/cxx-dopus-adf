@@ -176,8 +176,10 @@ bool cADFPluginData::AdfChangeToPath(std::filesystem::path path, bool pIgnoreLas
   if (pIgnoreLast) rel_path = rel_path.parent_path();
 
   for (auto& component : rel_path) {
-    if (adfChangeDir(mAdfVolume.get(), wstring_to_latin1(component.wstring()).data()) != ADF_RC_OK)
+    if (adfChangeDir(mAdfVolume.get(), wstring_to_latin1(component.wstring()).data()) != ADF_RC_OK) {
+      SetError(ERROR_NOT_FOUND);
       return false;
+    }
   }
 
   return true;
@@ -298,24 +300,20 @@ bool cADFPluginData::ReadDirectory(LPVFSREADDIRDATAW lpRDD) {
 }
 
 bool cADFPluginData::ReadFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD pReadSize) {
-  if (!pFile)
-    return false;
   *pReadSize = adfFileRead(pFile, static_cast<int32_t>(buffer.size()), buffer.data());
   return *pReadSize > 0;
 }
 
 AdfFile* cADFPluginData::OpenFile(std::filesystem::path path) {
-  if (!AdfChangeToPath(path, true))
+  auto filename = path.filename();
+
+  if (!AdfChangeToPath(std::move(path), true))
     return nullptr;
 
-  auto filename = path.filename();
   return adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename.wstring()).data(), ADF_FILE_MODE_READ);
 }
 
 void cADFPluginData::CloseFile(AdfFile* pFile) {
-  if (!pFile)
-    return;
-
   adfFileClose(pFile);
 }
 
@@ -363,7 +361,6 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
 }
 
 bool cADFPluginData::Delete(LPVOID func_data, std::filesystem::path path, std::set<std::filesystem::path> files, bool pAll) {
-  SetError(0);
   if (!AdfChangeToPath(path))
     return false;
 

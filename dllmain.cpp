@@ -14,7 +14,9 @@ __declspec(dllexport) bool VFS_ReadDirectoryW(cADFPluginData* hData, LPVFSFUNCDA
 __declspec(dllexport) cADFPluginData* VFS_Create(LPGUID pGuid);
 __declspec(dllexport) void VFS_Destroy(cADFPluginData* hData);
 
-__declspec(dllexport) AdfFile* VFS_CreateFileW(cADFPluginData* hData,
+__declspec(dllexport) BOOL WINAPI VFS_CreateDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwFlags);
+
+__declspec(dllexport) AdfFile* WINAPI VFS_CreateFileW(cADFPluginData* hData,
                                                LPVFSFUNCDATA lpVFSData,
                                                LPWSTR lpszPath,
                                                DWORD dwMode,
@@ -95,7 +97,7 @@ bool VFS_IdentifyW(LPVFSPLUGININFOW lpVFSInfo) {
   // Initialise plugin information
   lpVFSInfo->idPlugin = GUIDPlugin_ADF;
   lpVFSInfo->dwFlags = VFSF_CANCONFIGURE | VFSF_NONREENTRANT;
-  lpVFSInfo->dwCapabilities = VFSCAPABILITY_CASESENSITIVE | VFSCAPABILITY_POSTCOPYREREAD | VFSCAPABILITY_READONLY;
+  lpVFSInfo->dwCapabilities = VFSCAPABILITY_CASESENSITIVE | VFSCAPABILITY_POSTCOPYREREAD | VFSCAPABILITY_MULTICREATEDIR;
 
   StringCchCopyW(lpVFSInfo->lpszHandleExts, lpVFSInfo->cchHandleExtsMax, L".adf;.hdf");
   StringCchCopyW(lpVFSInfo->lpszName, lpVFSInfo->cchNameMax, L"Amiga ADF/HDF");
@@ -134,6 +136,10 @@ void VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFil
   hData->CloseFile(hFile);
 }
 
+BOOL VFS_CreateDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwFlags) {
+  return hData->CreateDir(lpszPath);
+}
+
 AdfFile* VFS_CreateFileW(cADFPluginData* hData,
                          LPVFSFUNCDATA lpVFSData,
                          LPWSTR lpszPath,
@@ -141,7 +147,7 @@ AdfFile* VFS_CreateFileW(cADFPluginData* hData,
                          DWORD dwFileAttr,
                          DWORD dwFlags,
                          LPFILETIME lpFT) {
-  return (hData) ? hData->OpenFile(lpszPath) : nullptr;
+  return hData->OpenFile(lpszPath);
 }
 
 bool VFS_ReadDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSREADDIRDATAW lpRDD) {
@@ -171,7 +177,7 @@ bool VFS_GetFreeDiskSpaceW(cADFPluginData* hData,
                            uint64_t* piFreeBytesAvailable,
                            uint64_t* piTotalBytes,
                            uint64_t* piTotalFreeBytes) {
-  hData->AdfChangeToPath(lpszPath);
+  if (!hData->LoadFile(lpszPath)) return false;
   if (piFreeBytesAvailable)
     *piFreeBytesAvailable = hData->GetAvailableSize();
   if (piTotalFreeBytes)

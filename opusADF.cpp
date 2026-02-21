@@ -168,6 +168,7 @@ bool cADFPluginData::AdfChangeToPath(std::filesystem::path path, bool pIgnoreLas
   auto maybe_rel_path = LoadFile(path);
   if (!maybe_rel_path) return false;
 
+  SetError(0);
   adfToRootDir(mAdfVolume.get());
   auto rel_path = std::move(*maybe_rel_path);
   if (rel_path == ".") return true;
@@ -209,6 +210,8 @@ bool is_subpath(const std::filesystem::path& base, const std::filesystem::path& 
 
 // TODO: migrate all to std::filesystem::path.
 std::optional<std::filesystem::path> cADFPluginData::LoadFile(const std::filesystem::path& path) {
+  SetError(0);
+
   if (!mPath.empty() && is_subpath(mPath, path)) {
     // Path is already loaded, no need to check again.
     return std::filesystem::relative(path, mPath);
@@ -218,6 +221,8 @@ std::optional<std::filesystem::path> cADFPluginData::LoadFile(const std::filesys
   mPath.clear();
   mAdfVolume.reset();
   mAdfDevice.reset();
+
+  SetError(ERROR_DEVICE_UNREACHABLE);
 
   // Walk the pAdfPath up until we find the valid file.
   std::filesystem::path real_file_path = path;
@@ -254,6 +259,7 @@ std::optional<std::filesystem::path> cADFPluginData::LoadFile(const std::filesys
   // Supported extension, path is valid. Accept.
   mPath = real_file_path;
 
+  SetError(0);
   return std::filesystem::relative(path, mPath);
 }
 
@@ -320,6 +326,28 @@ void cADFPluginData::CloseFile(AdfFile* pFile) {
     return;
 
   adfFileClose(pFile);
+}
+
+bool cADFPluginData::CreateDir(std::filesystem::path path) {
+  // Allow the function to fail. We know directories may not exist.
+  auto maybe_rel_path = LoadFile(path);
+  if (!maybe_rel_path) return false;
+
+  adfToRootDir(mAdfVolume.get());
+  auto dirs_to_create = std::move(*maybe_rel_path);
+  SetError(ERROR_CREATE_FAILED);
+  AdfEntry entry;
+  for (const auto& component : dirs_to_create) {
+    auto name = wstring_to_latin1(component.wstring());
+    if (adfGetEntry(mAdfVolume.get(), mAdfVolume->curDirPtr, name.data(), &entry) != ADF_RC_OK) {
+      if (adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, name.data()) != ADF_RC_OK) return false;
+    }
+
+    if (adfChangeDir(mAdfVolume.get(), name.data()) != ADF_RC_OK) return false;
+  }
+
+  SetError(0);
+  return true;
 }
 
 AdfTypedList<AdfEntry> cADFPluginData::GetCurrentDirectoryList() {
@@ -702,18 +730,18 @@ bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpDat
           ~(VFSFUNCAVAIL_MOVE
             // | VFSFUNCAVAIL_DELETE
             // | VFSFUNCAVAIL_GETSIZES
-            | VFSFUNCAVAIL_MAKEDIR | VFSFUNCAVAIL_PRINT | VFSFUNCAVAIL_PROPERTIES | VFSFUNCAVAIL_RENAME |
-            VFSFUNCAVAIL_SETATTR |
-            VFSFUNCAVAIL_SHORTCUT
+            // | VFSFUNCAVAIL_MAKEDIR 
+            | VFSFUNCAVAIL_PRINT | VFSFUNCAVAIL_PROPERTIES 
+            | VFSFUNCAVAIL_RENAME | VFSFUNCAVAIL_SETATTR | VFSFUNCAVAIL_SHORTCUT
             //| VFSFUNCAVAIL_SELECTALL
             //| VFSFUNCAVAIL_SELECTNONE
             //| VFSFUNCAVAIL_SELECTINVERT
-            | VFSFUNCAVAIL_VIEWLARGEICONS |
-            VFSFUNCAVAIL_VIEWSMALLICONS
+            | VFSFUNCAVAIL_VIEWLARGEICONS | VFSFUNCAVAIL_VIEWSMALLICONS
             //| VFSFUNCAVAIL_VIEWLIST
-            | VFSFUNCAVAIL_VIEWDETAILS | VFSFUNCAVAIL_VIEWTHUMBNAIL | VFSFUNCAVAIL_CLIPCOPY | VFSFUNCAVAIL_CLIPCUT |
-            VFSFUNCAVAIL_CLIPPASTE | VFSFUNCAVAIL_CLIPPASTESHORTCUT |
-            VFSFUNCAVAIL_UNDO
+            | VFSFUNCAVAIL_VIEWDETAILS | VFSFUNCAVAIL_VIEWTHUMBNAIL
+            // | VFSFUNCAVAIL_CLIPCOPY 
+            | VFSFUNCAVAIL_CLIPCUT | VFSFUNCAVAIL_CLIPPASTE | VFSFUNCAVAIL_CLIPPASTESHORTCUT 
+            | VFSFUNCAVAIL_UNDO
             //| VFSFUNCAVAIL_SHOW
             | VFSFUNCAVAIL_DUPLICATE |
             VFSFUNCAVAIL_SPLITJOIN

@@ -65,11 +65,11 @@ class cADFPluginData {
   FILETIME GetFileTime(const AdfEntry& entry);
   void SetEntryTime(AdfFile* pFile, FILETIME pFT);
 
-  std::optional<std::filesystem::path> LoadFile(const std::filesystem::path& pAfPath);
   AdfTypedList<AdfEntry> GetCurrentDirectoryList();
   void SetError(int error);
 
  public:
+  std::optional<std::filesystem::path> LoadFile(const std::filesystem::path& pAfPath);
   bool AdfChangeToPath(std::filesystem::path path, bool pIgnoreLast = false);
 
   bool ReadDirectory(LPVFSREADDIRDATAW lpRDD);
@@ -77,6 +77,7 @@ class cADFPluginData {
 
   AdfFile* OpenFile(std::filesystem::path path);
   void CloseFile(AdfFile* pFile);
+  bool CreateDir(std::filesystem::path path);
 
   size_t GetAvailableSize();
   size_t GetTotalSize();

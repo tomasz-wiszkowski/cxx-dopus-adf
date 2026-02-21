@@ -24,12 +24,21 @@ __declspec(dllexport) AdfFile* WINAPI VFS_CreateFileW(cADFPluginData* hData,
                                                DWORD dwFlags,
                                                LPFILETIME lpFT);
 
-__declspec(dllexport) bool VFS_ReadFile(cADFPluginData* hData,
-                                        LPVFSFUNCDATA lpVFSData,
-                                        AdfFile* hFile,
-                                        LPVOID lpData,
-                                        DWORD dwSize,
-                                        LPDWORD lpdwReadSize);
+__declspec(dllexport) bool WINAPI VFS_ReadFile(cADFPluginData* hData,
+                                               LPVFSFUNCDATA lpVFSData,
+                                               AdfFile* hFile,
+                                               LPVOID lpData,
+                                               DWORD dwSize,
+                                               LPDWORD lpdwReadSize);
+
+__declspec(dllexport) BOOL WINAPI VFS_WriteFile(cADFPluginData* data,
+                                                LPVFSFUNCDATA lpFuncData,
+                                                AdfFile* hFile,
+                                                LPVOID lpData,
+                                                DWORD dwSize,
+                                                BOOL fFlush,
+                                                LPDWORD lpdwWriteSize);
+
 __declspec(dllexport) void VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile);
 
 __declspec(dllexport) int VFS_ContextVerbW(cADFPluginData* hData,
@@ -132,6 +141,16 @@ bool VFS_ReadFile(cADFPluginData* hData,
   return hData->ReadFile(hFile, std::span<uint8_t>(static_cast<uint8_t*>(lpData), dwSize), lpdwReadSize);
 }
 
+BOOL VFS_WriteFile(cADFPluginData* data,
+                   LPVFSFUNCDATA lpFuncData,
+                   AdfFile* hFile,
+                   LPVOID lpData,
+                   DWORD dwSize,
+                   BOOL fFlush,
+                   LPDWORD lpdwWriteSize) {
+  return data->WriteFile(hFile, std::span<uint8_t>(static_cast<uint8_t*>(lpData), dwSize), lpdwWriteSize);
+}
+
 void VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile) {
   hData->CloseFile(hFile);
 }
@@ -147,7 +166,7 @@ AdfFile* VFS_CreateFileW(cADFPluginData* hData,
                          DWORD dwFileAttr,
                          DWORD dwFlags,
                          LPFILETIME lpFT) {
-  return hData->OpenFile(lpszPath);
+  return hData->OpenFile(lpszPath, dwMode == GENERIC_WRITE);
 }
 
 bool VFS_ReadDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPVFSREADDIRDATAW lpRDD) {

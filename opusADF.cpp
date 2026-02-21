@@ -304,13 +304,18 @@ bool cADFPluginData::ReadFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD
   return *pReadSize > 0;
 }
 
-AdfFile* cADFPluginData::OpenFile(std::filesystem::path path) {
+bool cADFPluginData::WriteFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD pWriteSize) {
+  *pWriteSize = adfFileWrite(pFile, static_cast<int32_t>(buffer.size()), buffer.data());
+  return *pWriteSize > 0;
+}
+
+AdfFile* cADFPluginData::OpenFile(std::filesystem::path path, bool for_writing) {
   auto filename = path.filename();
 
   if (!AdfChangeToPath(std::move(path), true))
     return nullptr;
 
-  return adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename.wstring()).data(), ADF_FILE_MODE_READ);
+  return adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename.wstring()).data(), for_writing ? ADF_FILE_MODE_WRITE : ADF_FILE_MODE_READ);
 }
 
 void cADFPluginData::CloseFile(AdfFile* pFile) {
@@ -713,7 +718,9 @@ bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpDat
             //| VFSFUNCAVAIL_VIEWLIST
             | VFSFUNCAVAIL_VIEWDETAILS | VFSFUNCAVAIL_VIEWTHUMBNAIL
             // | VFSFUNCAVAIL_CLIPCOPY 
-            | VFSFUNCAVAIL_CLIPCUT | VFSFUNCAVAIL_CLIPPASTE | VFSFUNCAVAIL_CLIPPASTESHORTCUT 
+            | VFSFUNCAVAIL_CLIPCUT
+            // | VFSFUNCAVAIL_CLIPPASTE 
+            | VFSFUNCAVAIL_CLIPPASTESHORTCUT 
             | VFSFUNCAVAIL_UNDO
             //| VFSFUNCAVAIL_SHOW
             | VFSFUNCAVAIL_DUPLICATE |

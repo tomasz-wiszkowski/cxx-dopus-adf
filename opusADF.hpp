@@ -74,8 +74,9 @@ class cADFPluginData {
 
   bool ReadDirectory(LPVFSREADDIRDATAW lpRDD);
   bool ReadFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD readSize);
+  bool WriteFile(AdfFile* pFile, std::span<uint8_t> buffer, LPDWORD writeSize);
 
-  AdfFile* OpenFile(std::filesystem::path path);
+  AdfFile* OpenFile(std::filesystem::path path, bool for_writing);
   void CloseFile(AdfFile* pFile);
   bool CreateDir(std::filesystem::path path);
 

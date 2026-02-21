@@ -15,19 +15,12 @@ std::wstring latin1_to_wstring(std::string_view latin1);
 /// @return latin1 encoded string
 std::string wstring_to_latin1(std::wstring_view wide);
 
-/// @brief Convert a wide string to utf8 encoding
-/// @param wide Input string in wide character encoding (UTF-16 on Windows)
-/// @return latin1 encoded string
-std::filesystem::path wstring_to_path(std::wstring_view wide);
+/// @brief Clean up input paths ensuring that it always contains the "filename" stem, even if pointing to a directory.
+/// @param in The path to sanitize.
+/// @return sanitized path.
+std::filesystem::path sanitize(std::filesystem::path in);
 
-/// @brief Split a path string into its components
-/// @param path Input string to split
-/// @param relative_to Optional base path to make the split relative to. If
-/// empty, the split is absolute.
-/// @return Vector of string views representing the split parts
-std::vector<std::wstring_view> split_path_to_components(std::wstring_view path, std::wstring_view relative_to = L"");
-
-/// @brief Returns the file name from a path
-/// @param path Path string to extract the file name from
-/// @return the file name component of the path
-std::wstring_view file_from_path(std::wstring_view path);
+/// @brief Returns whether `node` path points to a root or a sub-element of the `base` path.
+/// @param base The base path (e.g. namespace).
+/// @param node The node path to check.
+bool is_subpath(const std::filesystem::path& base, const std::filesystem::path& node);

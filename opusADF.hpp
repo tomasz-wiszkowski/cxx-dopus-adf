@@ -69,7 +69,7 @@ class cADFPluginData {
   void SetError(int error);
 
  public:
-  std::optional<std::filesystem::path> LoadFile(const std::filesystem::path& pAfPath);
+  std::optional<std::filesystem::path> LoadFile(std::filesystem::path pAfPath);
   bool AdfChangeToPath(std::filesystem::path path, bool pIgnoreLast = false);
 
   bool ReadDirectory(LPVFSREADDIRDATAW lpRDD);

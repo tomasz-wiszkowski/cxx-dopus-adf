@@ -18,6 +18,7 @@ std::wstring latin1_to_wstring(std::string_view latin1) {
   return wide;
 }
 
+
 std::string wstring_to_latin1(std::wstring_view wide) {
   int latin1_len =
       WideCharToMultiByte(28591,  // ISO-8859-1 code page
@@ -36,39 +37,21 @@ std::string wstring_to_latin1(std::wstring_view wide) {
   return latin1;
 }
 
-std::filesystem::path wstring_to_path(std::wstring_view wide) {
-  return std::filesystem::path(wide);
+
+std::filesystem::path sanitize(std::filesystem::path in) {
+  // Remove trailing `/` 
+  if (!in.has_filename()) in = in.parent_path();
+  // Convert all the `.` and `..` to an actual target path.
+  return in.lexically_normal();
 }
 
-std::vector<std::wstring_view> split_path_to_components(std::wstring_view path, std::wstring_view relative_to) {
-  std::vector<std::wstring_view> components;
-  std::wstring::size_type pos_begin, pos_end = 0;
 
-  if (!relative_to.empty()) {
-    if (path.find(relative_to) == 0) {
-      path.remove_prefix(relative_to.size());
-    } else {
-      // relative_to is not a prefix of path, return empty components
-      return components;
-    }
-  }
+bool is_subpath(const std::filesystem::path& base, const std::filesystem::path& node) {
+    auto b = base.lexically_normal();
+    auto n = node.lexically_normal();
 
-  // TODO: there must be a more efficient way to do this
-  while ((pos_begin = path.find_first_not_of(L"\\\\", pos_end)) != std::wstring::npos) {
-    pos_end = path.find_first_of(L"\\\\", pos_begin);
-    if (pos_end == std::wstring::npos)
-      pos_end = path.size();
-    components.push_back(path.substr(pos_begin, pos_end - pos_begin));
-  }
-
-  return components;
-}
-
-std::wstring_view file_from_path(std::wstring_view path) {
-  auto pos = path.find_last_of(L"\\\\");
-  if (pos == std::wstring::npos) {
-    return path;
-  } else {
-    return path.substr(pos + 1);
-  }
+    return std::mismatch(
+        b.begin(), b.end(),
+        n.begin(), n.end()
+    ).first == b.end();
 }

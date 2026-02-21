@@ -96,7 +96,7 @@ void VFS_Uninit() {
 bool VFS_IdentifyW(LPVFSPLUGININFOW lpVFSInfo) {
   // Initialise plugin information
   lpVFSInfo->idPlugin = GUIDPlugin_ADF;
-  lpVFSInfo->dwFlags = VFSF_CANCONFIGURE | VFSF_NONREENTRANT;
+  lpVFSInfo->dwFlags = VFSF_CANCONFIGURE;
   lpVFSInfo->dwCapabilities = VFSCAPABILITY_CASESENSITIVE | VFSCAPABILITY_POSTCOPYREREAD | VFSCAPABILITY_MULTICREATEDIR;
 
   StringCchCopyW(lpVFSInfo->lpszHandleExts, lpVFSInfo->cchHandleExtsMax, L".adf;.hdf");

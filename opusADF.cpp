@@ -165,7 +165,7 @@ void cADFPluginData::GetWfdForEntry(const AdfEntry& entry, LPWIN32_FIND_DATA pDa
 }
 
 bool cADFPluginData::AdfChangeToPath(std::filesystem::path path, bool pIgnoreLast) {
-  auto maybe_rel_path = LoadFile(path);
+  auto maybe_rel_path = LoadFile(std::move(path));
   if (!maybe_rel_path) return false;
 
   SetError(0);
@@ -198,18 +198,9 @@ void AdfVolumeDeleter::operator()(AdfVolume* volume) const {
 }
 }  // namespace adf
 
-bool is_subpath(const std::filesystem::path& base, const std::filesystem::path& node) {
-    auto b = base.lexically_normal();
-    auto n = node.lexically_normal();
-
-    return std::mismatch(
-        b.begin(), b.end(),
-        n.begin(), n.end()
-    ).first == b.end();
-}
-
 // TODO: migrate all to std::filesystem::path.
-std::optional<std::filesystem::path> cADFPluginData::LoadFile(const std::filesystem::path& path) {
+std::optional<std::filesystem::path> cADFPluginData::LoadFile(std::filesystem::path path) {
+  path = sanitize(std::move(path));
   SetError(0);
 
   if (!mPath.empty() && is_subpath(mPath, path)) {
@@ -330,7 +321,7 @@ void cADFPluginData::CloseFile(AdfFile* pFile) {
 
 bool cADFPluginData::CreateDir(std::filesystem::path path) {
   // Allow the function to fail. We know directories may not exist.
-  auto maybe_rel_path = LoadFile(path);
+  auto maybe_rel_path = LoadFile(std::move(path));
   if (!maybe_rel_path) return false;
 
   adfToRootDir(mAdfVolume.get());
@@ -380,7 +371,7 @@ bool cADFPluginData::Delete(LPVOID func_data, std::filesystem::path path, std::s
   // Transform all strings to latin1
   std::set<std::string> adf_files;
   std::ranges::transform(files, std::inserter(adf_files, adf_files.end()), [](auto path) {
-    if (!path.has_filename()) path = path.parent_path();
+    path = sanitize(std::move(path));
     return wstring_to_latin1(path.filename().wstring());
   });
 
@@ -559,8 +550,7 @@ bool cADFPluginData::Extract(LPVOID func_data, std::filesystem::path source_path
 
   auto directory = GetCurrentDirectoryList();
   // If filename is empty, it means the path ended with a slash, so get the parent directory name instead.
-  if (!source_path.has_filename())
-    source_path = source_path.parent_path();
+  source_path = sanitize(std::move(source_path));
   auto entry_name = source_path.filename().wstring();
   auto iter = std::ranges::find_if(directory, AdfFindEntry(entry_name));
   if (iter == directory.end())

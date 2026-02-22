@@ -7,7 +7,6 @@
 #include "adf_typed_list.hh"
 #include "dopus_wstring_view_span.hh"
 
-
 namespace adf {
 struct AdfDeviceDeleter {
   void operator()(AdfDevice* device) const;

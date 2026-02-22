@@ -4,7 +4,6 @@
 
 #include "external/adflib/src/adf_str.h"
 
-
 template <typename T>
 class AdfTypedIterator {
  public:

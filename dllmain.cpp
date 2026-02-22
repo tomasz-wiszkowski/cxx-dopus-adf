@@ -14,15 +14,18 @@ __declspec(dllexport) bool VFS_ReadDirectoryW(cADFPluginData* hData, LPVFSFUNCDA
 __declspec(dllexport) cADFPluginData* VFS_Create(LPGUID pGuid);
 __declspec(dllexport) void VFS_Destroy(cADFPluginData* hData);
 
-__declspec(dllexport) BOOL WINAPI VFS_CreateDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwFlags);
+__declspec(dllexport) BOOL WINAPI VFS_CreateDirectoryW(cADFPluginData* hData,
+                                                       LPVFSFUNCDATA lpFuncData,
+                                                       LPTSTR lpszPath,
+                                                       DWORD dwFlags);
 
 __declspec(dllexport) AdfFile* WINAPI VFS_CreateFileW(cADFPluginData* hData,
-                                               LPVFSFUNCDATA lpVFSData,
-                                               LPWSTR lpszPath,
-                                               DWORD dwMode,
-                                               DWORD dwFileAttr,
-                                               DWORD dwFlags,
-                                               LPFILETIME lpFT);
+                                                      LPVFSFUNCDATA lpVFSData,
+                                                      LPWSTR lpszPath,
+                                                      DWORD dwMode,
+                                                      DWORD dwFileAttr,
+                                                      DWORD dwFlags,
+                                                      LPFILETIME lpFT);
 
 __declspec(dllexport) bool WINAPI VFS_ReadFile(cADFPluginData* hData,
                                                LPVFSFUNCDATA lpVFSData,
@@ -39,21 +42,25 @@ __declspec(dllexport) BOOL WINAPI VFS_WriteFile(cADFPluginData* data,
                                                 BOOL fFlush,
                                                 LPDWORD lpdwWriteSize);
 
-__declspec(dllexport) BOOL WINAPI VFS_SetFileAttrW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwAttr, BOOL fForDelete);
-__declspec(dllexport) BOOL WINAPI VFS_SetFileCommentW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, LPTSTR lpszComment);
+__declspec(dllexport) BOOL WINAPI
+VFS_SetFileAttrW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwAttr, BOOL fForDelete);
+__declspec(dllexport) BOOL WINAPI VFS_SetFileCommentW(cADFPluginData* hData,
+                                                      LPVFSFUNCDATA lpFuncData,
+                                                      LPTSTR lpszPath,
+                                                      LPTSTR lpszComment);
 __declspec(dllexport) BOOL WINAPI VFS_SetFileTimeW(cADFPluginData* hData,
-                     LPVFSFUNCDATA lpFuncData,
-                     LPTSTR lpszPath,
-                     LPFILETIME lpCreateTime,
-                     LPFILETIME lpAccessTime,
-                     LPFILETIME lpWriteTime);
+                                                   LPVFSFUNCDATA lpFuncData,
+                                                   LPTSTR lpszPath,
+                                                   LPFILETIME lpCreateTime,
+                                                   LPFILETIME lpAccessTime,
+                                                   LPFILETIME lpWriteTime);
 
 __declspec(dllexport) void WINAPI VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile);
 
 __declspec(dllexport) BOOL WINAPI VFS_MoveFileW(cADFPluginData* hVFSData,
-                                               LPVFSFUNCDATA lpFuncData,
-                                               LPTSTR lpszOldPath,
-                                               LPTSTR lpszNewPath);
+                                                LPVFSFUNCDATA lpFuncData,
+                                                LPTSTR lpszOldPath,
+                                                LPTSTR lpszNewPath);
 
 __declspec(dllexport) int VFS_ContextVerbW(cADFPluginData* hData,
                                            LPVFSFUNCDATA lpVFSData,
@@ -119,8 +126,9 @@ void VFS_Uninit() {
 bool VFS_IdentifyW(LPVFSPLUGININFOW lpVFSInfo) {
   // Initialise plugin information
   lpVFSInfo->idPlugin = GUIDPlugin_ADF;
-  lpVFSInfo->dwFlags = VFSF_CANCONFIGURE;
-  lpVFSInfo->dwCapabilities = VFSCAPABILITY_CASESENSITIVE | VFSCAPABILITY_POSTCOPYREREAD | VFSCAPABILITY_MULTICREATEDIR | VFSCAPABILITY_MOVEBYRENAME;
+  lpVFSInfo->dwFlags = /* VFSF_CANCONFIGURE | VFSF_SHOWABOUT, or - for now - just */ 0;
+  lpVFSInfo->dwCapabilities = VFSCAPABILITY_CASESENSITIVE | VFSCAPABILITY_POSTCOPYREREAD |
+                              VFSCAPABILITY_MULTICREATEDIR | VFSCAPABILITY_MOVEBYRENAME;
 
   StringCchCopyW(lpVFSInfo->lpszHandleExts, lpVFSInfo->cchHandleExtsMax, L".adf;.hdf");
   StringCchCopyW(lpVFSInfo->lpszName, lpVFSInfo->cchNameMax, L"Amiga ADF/HDF");
@@ -214,7 +222,8 @@ bool VFS_GetFreeDiskSpaceW(cADFPluginData* hData,
                            uint64_t* piFreeBytesAvailable,
                            uint64_t* piTotalBytes,
                            uint64_t* piTotalFreeBytes) {
-  if (!hData->LoadFile(lpszPath)) return false;
+  if (!hData->LoadFile(lpszPath))
+    return false;
   if (piFreeBytesAvailable)
     *piFreeBytesAvailable = hData->GetAvailableSize();
   if (piTotalFreeBytes)
@@ -270,10 +279,10 @@ BOOL VFS_SetFileCommentW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR
 }
 
 BOOL VFS_SetFileTimeW(cADFPluginData* hData,
-                     LPVFSFUNCDATA lpFuncData,
-                     LPTSTR lpszPath,
-                     LPFILETIME lpCreateTime,
-                     LPFILETIME lpAccessTime,
-                     LPFILETIME lpWriteTime) {
+                      LPVFSFUNCDATA lpFuncData,
+                      LPTSTR lpszPath,
+                      LPFILETIME lpCreateTime,
+                      LPFILETIME lpAccessTime,
+                      LPFILETIME lpWriteTime) {
   return false;
 }

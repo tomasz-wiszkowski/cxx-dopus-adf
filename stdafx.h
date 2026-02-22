@@ -24,8 +24,6 @@
 #include <string>
 #include <vector>
 
-typedef const BYTE *LPCBYTE;
-
 extern "C" {
 #include "external/dopus_sdk/headers/vfs plugins.h"
 #include "external/dopus_sdk/headers/plugin support.h"

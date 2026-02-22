@@ -18,7 +18,6 @@ std::wstring latin1_to_wstring(std::string_view latin1) {
   return wide;
 }
 
-
 std::string wstring_to_latin1(std::wstring_view wide) {
   int latin1_len =
       WideCharToMultiByte(28591,  // ISO-8859-1 code page
@@ -37,21 +36,17 @@ std::string wstring_to_latin1(std::wstring_view wide) {
   return latin1;
 }
 
-
 std::filesystem::path sanitize(std::filesystem::path in) {
-  // Remove trailing `/` 
-  if (!in.has_filename()) in = in.parent_path();
+  // Remove trailing `/`
+  if (!in.has_filename())
+    in = in.parent_path();
   // Convert all the `.` and `..` to an actual target path.
   return in.lexically_normal();
 }
 
-
 bool is_subpath(const std::filesystem::path& base, const std::filesystem::path& node) {
-    auto b = base.lexically_normal();
-    auto n = node.lexically_normal();
+  auto b = base.lexically_normal();
+  auto n = node.lexically_normal();
 
-    return std::mismatch(
-        b.begin(), b.end(),
-        n.begin(), n.end()
-    ).first == b.end();
+  return std::mismatch(b.begin(), b.end(), n.begin(), n.end()).first == b.end();
 }

@@ -5,7 +5,6 @@
 #include <iterator>
 #include <string_view>
 
-
 namespace dopus {
 
 /// @brief Wrapper for iterating over a double-NUL-terminated sequence of NUL-delimited wide strings.

@@ -11,7 +11,7 @@ class AdfTypedList {
 
   explicit AdfTypedList(AdfList* list, void (*deleter)(AdfList*)) : list_(list), deleter_(deleter) {}
 
-  explicit AdfTypedList(AdfTypedList&& other) noexcept { *this = std::move(other); }
+  AdfTypedList(AdfTypedList&& other) noexcept { *this = std::move(other); }
 
   AdfTypedList<T>& operator=(AdfTypedList&& other) noexcept {
     if (this != &other) {

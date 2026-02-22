@@ -9,7 +9,6 @@
 #include "stdafx.h"
 #include "text_utils.hh"
 
-
 namespace {
 /// @brief Predicate to check if an AdfEntry is a supported type (file or directory).
 /// @param type The AdfEntry type to check.
@@ -166,14 +165,17 @@ void cADFPluginData::GetWfdForEntry(const AdfEntry& entry, LPWIN32_FIND_DATA pDa
 
 bool cADFPluginData::AdfChangeToPath(std::filesystem::path path, bool pIgnoreLast) {
   auto maybe_rel_path = LoadFile(std::move(path));
-  if (!maybe_rel_path) return false;
+  if (!maybe_rel_path)
+    return false;
 
   SetError(0);
   adfToRootDir(mAdfVolume.get());
   auto rel_path = std::move(*maybe_rel_path);
-  if (rel_path == ".") return true;
+  if (rel_path == ".")
+    return true;
 
-  if (pIgnoreLast) rel_path = rel_path.parent_path();
+  if (pIgnoreLast)
+    rel_path = rel_path.parent_path();
 
   for (auto& component : rel_path) {
     if (adfChangeDir(mAdfVolume.get(), wstring_to_latin1(component.wstring()).data()) != ADF_RC_OK) {
@@ -238,8 +240,10 @@ std::optional<std::filesystem::path> cADFPluginData::LoadFile(std::filesystem::p
 
   bool allow_rw = true;
   mAdfDevice.reset(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READWRITE));
-  if (!mAdfDevice) mAdfDevice.reset(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READONLY));
-  if (!mAdfDevice) return {};
+  if (!mAdfDevice)
+    mAdfDevice.reset(adfDevOpen(utf_file_path.c_str(), ADF_ACCESS_MODE_READONLY));
+  if (!mAdfDevice)
+    return {};
 
   adfDevMount(mAdfDevice.get());
 
@@ -315,7 +319,8 @@ AdfFile* cADFPluginData::OpenFile(std::filesystem::path path, bool for_writing) 
   if (!AdfChangeToPath(std::move(path), true))
     return nullptr;
 
-  return adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename.wstring()).data(), for_writing ? ADF_FILE_MODE_WRITE : ADF_FILE_MODE_READ);
+  return adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename.wstring()).data(),
+                     for_writing ? ADF_FILE_MODE_WRITE : ADF_FILE_MODE_READ);
 }
 
 void cADFPluginData::CloseFile(AdfFile* pFile) {
@@ -332,14 +337,16 @@ bool cADFPluginData::MoveFile(std::filesystem::path old_name, std::filesystem::p
     return false;
   }
 
-  return adfRenameEntry(mAdfVolume.get(), mAdfVolume->curDirPtr, wstring_to_latin1(old_name.filename().wstring()).data(),
-    new_psect, wstring_to_latin1(new_name.filename().wstring()).data()) == ADF_RC_OK;
+  return adfRenameEntry(mAdfVolume.get(), mAdfVolume->curDirPtr,
+                        wstring_to_latin1(old_name.filename().wstring()).data(), new_psect,
+                        wstring_to_latin1(new_name.filename().wstring()).data()) == ADF_RC_OK;
 }
 
 bool cADFPluginData::CreateDir(std::filesystem::path path) {
   // Allow the function to fail. We know directories may not exist.
   auto maybe_rel_path = LoadFile(std::move(path));
-  if (!maybe_rel_path) return false;
+  if (!maybe_rel_path)
+    return false;
 
   adfToRootDir(mAdfVolume.get());
   auto dirs_to_create = std::move(*maybe_rel_path);
@@ -348,10 +355,12 @@ bool cADFPluginData::CreateDir(std::filesystem::path path) {
   for (const auto& component : dirs_to_create) {
     auto name = wstring_to_latin1(component.wstring());
     if (adfGetEntry(mAdfVolume.get(), mAdfVolume->curDirPtr, name.data(), &entry) != ADF_RC_OK) {
-      if (adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, name.data()) != ADF_RC_OK) return false;
+      if (adfCreateDir(mAdfVolume.get(), mAdfVolume->curDirPtr, name.data()) != ADF_RC_OK)
+        return false;
     }
 
-    if (adfChangeDir(mAdfVolume.get(), name.data()) != ADF_RC_OK) return false;
+    if (adfChangeDir(mAdfVolume.get(), name.data()) != ADF_RC_OK)
+      return false;
   }
 
   SetError(0);
@@ -379,7 +388,10 @@ int cADFPluginData::ContextVerb(LPVFSCONTEXTVERBDATAW lpVerbData) {
   return VFSCVRES_DEFAULT;
 }
 
-bool cADFPluginData::Delete(LPVOID func_data, std::filesystem::path path, std::set<std::filesystem::path> files, bool pAll) {
+bool cADFPluginData::Delete(LPVOID func_data,
+                            std::filesystem::path path,
+                            std::set<std::filesystem::path> files,
+                            bool pAll) {
   if (!AdfChangeToPath(path))
     return false;
 
@@ -395,7 +407,8 @@ bool cADFPluginData::Delete(LPVOID func_data, std::filesystem::path path, std::s
   bool files_deleted = false;
   auto directory = GetCurrentDirectoryList();
   for (const AdfEntry& entry : directory) {
-    if (ShouldAbort()) return false;
+    if (ShouldAbort())
+      return false;
 
     if (pAll || adf_files.contains(entry.name)) {
       files_deleted = true;
@@ -409,11 +422,14 @@ bool cADFPluginData::Delete(LPVOID func_data, std::filesystem::path path, std::s
     }
   }
 
-  if (files_deleted) DOpus.AddFunctionFileChange(func_data, /* fIsDest= */ FALSE, OPUSFILECHANGE_REFRESH, path.wstring().data());
+  if (files_deleted)
+    DOpus.AddFunctionFileChange(func_data, /* fIsDest= */ FALSE, OPUSFILECHANGE_REFRESH, path.wstring().data());
   return success;
 }
 
-cADFFindData* cADFPluginData::FindFirstFile(std::filesystem::path path, LPWIN32_FIND_DATA lpwfdData, HANDLE hAbortEvent) {
+cADFFindData* cADFPluginData::FindFirstFile(std::filesystem::path path,
+                                            LPWIN32_FIND_DATA lpwfdData,
+                                            HANDLE hAbortEvent) {
   if (!AdfChangeToPath(path, true))
     return nullptr;
 
@@ -423,7 +439,8 @@ cADFFindData* cADFPluginData::FindFirstFile(std::filesystem::path path, LPWIN32_
     find_data->mPattern = std::regex("(" + pattern + ")");
   }
 
-  if (!FindNextFile(find_data.get(), lpwfdData)) find_data.reset();
+  if (!FindNextFile(find_data.get(), lpwfdData))
+    find_data.reset();
 
   return find_data.release();
 }
@@ -433,8 +450,10 @@ bool cADFPluginData::FindNextFile(cADFFindData* pFindData, LPWIN32_FIND_DATA lpw
   auto& iter = pFindData->mCurrentEntry;
 
   for (; iter != directory.end(); ++iter) {
-    if (!IsSupportedEntryType(iter->type)) continue;
-    if (pFindData->mPattern && !std::regex_match(iter->name, *pFindData->mPattern)) continue;
+    if (!IsSupportedEntryType(iter->type))
+      continue;
+    if (pFindData->mPattern && !std::regex_match(iter->name, *pFindData->mPattern))
+      continue;
     break;
   }
 
@@ -461,7 +480,6 @@ int cADFPluginData::ImportFile(LPVOID func_data, std::filesystem::path destinati
   std::ifstream t(source.native(), std::ios::binary);
   std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
   DOpus.UpdateFunctionProgressBar(func_data, PROGRESSACTION_SETFILESIZE, (DWORD_PTR)buffer.size());
-
 
   auto file = adfFileOpen(mAdfVolume.get(), wstring_to_latin1(filename.wstring()).data(), ADF_FILE_MODE_WRITE);
   if (!file)
@@ -614,7 +632,8 @@ bool cADFPluginData::ExtractFile(LPVOID func_data, const AdfEntry& pEntry, std::
 }
 
 size_t cADFPluginData::GetAvailableSize() {
-  if (!mAdfVolume) return 0;
+  if (!mAdfVolume)
+    return 0;
 
   size_t blocks = adfCountFreeBlocks(mAdfVolume.get());
   blocks *= mAdfVolume->datablockSize;
@@ -642,12 +661,12 @@ uint32_t cADFPluginData::BatchOperation(std::filesystem::path path, LPVFSBATCHDA
 
   if (lpBatchData->uiOperation == VFSBATCHOP_EXTRACT) {
     // TODO: maybe pass piResults, too.
-    return ExtractEntries(lpBatchData->lpFuncData, entry_names, lpBatchData->pszDestPath)
-               ? VFSBATCHRES_COMPLETE
-               : VFSBATCHRES_ABORT;
+    return ExtractEntries(lpBatchData->lpFuncData, entry_names, lpBatchData->pszDestPath) ? VFSBATCHRES_COMPLETE
+                                                                                          : VFSBATCHRES_ABORT;
   } else if (lpBatchData->uiOperation == VFSBATCHOP_DELETE) {
     std::set<std::filesystem::path> entries_to_delete(entry_names.begin(), entry_names.end());
-    return Delete(lpBatchData->lpFuncData, path, std::move(entries_to_delete)) ? VFSBATCHRES_COMPLETE : VFSBATCHRES_ABORT;
+    return Delete(lpBatchData->lpFuncData, path, std::move(entries_to_delete)) ? VFSBATCHRES_COMPLETE
+                                                                               : VFSBATCHRES_ABORT;
   }
 
   DOpus.UpdateFunctionProgressBar(lpBatchData->lpFuncData, PROGRESSACTION_SETPERCENT, (DWORD_PTR)0);
@@ -665,7 +684,6 @@ uint32_t cADFPluginData::BatchOperation(std::filesystem::path path, LPVFSBATCHDA
     if (lpBatchData->uiOperation == VFSBATCHOP_ADD) {
       lpBatchData->piResults[index] = Import(lpBatchData->lpFuncData, path, entry_path);
     }
-
 
     // Abort on failure.
     if (lpBatchData->piResults[index]) {
@@ -718,33 +736,35 @@ bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpDat
       break;
 
     case VFSPROP_FUNCAVAILABILITY:
-      *reinterpret_cast<LPDWORD>(lpPropData) &=
-          ~(// VFSFUNCAVAIL_MOVE
-            // | VFSFUNCAVAIL_DELETE
-            // | VFSFUNCAVAIL_GETSIZES
-            // | VFSFUNCAVAIL_MAKEDIR 
-            VFSFUNCAVAIL_PRINT | VFSFUNCAVAIL_PROPERTIES 
-            // | VFSFUNCAVAIL_RENAME 
-            | VFSFUNCAVAIL_SETATTR | VFSFUNCAVAIL_SHORTCUT
-            //| VFSFUNCAVAIL_SELECTALL
-            //| VFSFUNCAVAIL_SELECTNONE
-            //| VFSFUNCAVAIL_SELECTINVERT
-            | VFSFUNCAVAIL_VIEWLARGEICONS | VFSFUNCAVAIL_VIEWSMALLICONS
-            // | VFSFUNCAVAIL_VIEWLIST
-            // | VFSFUNCAVAIL_VIEWDETAILS | VFSFUNCAVAIL_VIEWTHUMBNAIL
-            // | VFSFUNCAVAIL_CLIPCOPY 
-            | VFSFUNCAVAIL_CLIPCUT
-            // | VFSFUNCAVAIL_CLIPPASTE 
-            | VFSFUNCAVAIL_CLIPPASTESHORTCUT 
-            | VFSFUNCAVAIL_UNDO
-            //| VFSFUNCAVAIL_SHOW
-            | VFSFUNCAVAIL_DUPLICATE |
-            VFSFUNCAVAIL_SPLITJOIN
-            //| VFSFUNCAVAIL_SELECTRESELECT
-            //| VFSFUNCAVAIL_SELECTALLFILES
-            //| VFSFUNCAVAIL_SELECTALLDIRS
-            //| VFSFUNCAVAIL_PLAY
-            | VFSFUNCAVAIL_SETTIME | VFSFUNCAVAIL_VIEWTILE | VFSFUNCAVAIL_SETCOMMENT);
+      *reinterpret_cast<LPDWORD>(lpPropData) &= ~(  // VFSFUNCAVAIL_MOVE
+                                                    // | VFSFUNCAVAIL_DELETE
+                                                    // | VFSFUNCAVAIL_GETSIZES
+                                                    // | VFSFUNCAVAIL_MAKEDIR
+          VFSFUNCAVAIL_PRINT |
+          VFSFUNCAVAIL_PROPERTIES
+          // | VFSFUNCAVAIL_RENAME
+          | VFSFUNCAVAIL_SETATTR |
+          VFSFUNCAVAIL_SHORTCUT
+          //| VFSFUNCAVAIL_SELECTALL
+          //| VFSFUNCAVAIL_SELECTNONE
+          //| VFSFUNCAVAIL_SELECTINVERT
+          | VFSFUNCAVAIL_VIEWLARGEICONS |
+          VFSFUNCAVAIL_VIEWSMALLICONS
+          // | VFSFUNCAVAIL_VIEWLIST
+          // | VFSFUNCAVAIL_VIEWDETAILS | VFSFUNCAVAIL_VIEWTHUMBNAIL
+          // | VFSFUNCAVAIL_CLIPCOPY
+          | VFSFUNCAVAIL_CLIPCUT
+          // | VFSFUNCAVAIL_CLIPPASTE
+          | VFSFUNCAVAIL_CLIPPASTESHORTCUT |
+          VFSFUNCAVAIL_UNDO
+          //| VFSFUNCAVAIL_SHOW
+          | VFSFUNCAVAIL_DUPLICATE |
+          VFSFUNCAVAIL_SPLITJOIN
+          //| VFSFUNCAVAIL_SELECTRESELECT
+          //| VFSFUNCAVAIL_SELECTALLFILES
+          //| VFSFUNCAVAIL_SELECTALLDIRS
+          //| VFSFUNCAVAIL_PLAY
+          | VFSFUNCAVAIL_SETTIME | VFSFUNCAVAIL_VIEWTILE | VFSFUNCAVAIL_SETCOMMENT);
       break;
 
       // VFSPROP_GETFOLDERICON -> return icon file?

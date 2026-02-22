@@ -78,6 +78,7 @@ class cADFPluginData {
 
   AdfFile* OpenFile(std::filesystem::path path, bool for_writing);
   void CloseFile(AdfFile* pFile);
+  bool MoveFile(std::filesystem::path old_name, std::filesystem::path new_name);
   bool CreateDir(std::filesystem::path path);
 
   size_t GetAvailableSize();

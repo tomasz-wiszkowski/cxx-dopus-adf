@@ -322,6 +322,20 @@ void cADFPluginData::CloseFile(AdfFile* pFile) {
   adfFileClose(pFile);
 }
 
+bool cADFPluginData::MoveFile(std::filesystem::path old_name, std::filesystem::path new_name) {
+  if (!AdfChangeToPath(new_name, true)) {
+    return false;
+  }
+  auto new_psect = mAdfVolume->curDirPtr;
+
+  if (!AdfChangeToPath(old_name, true)) {
+    return false;
+  }
+
+  return adfRenameEntry(mAdfVolume.get(), mAdfVolume->curDirPtr, wstring_to_latin1(old_name.filename().wstring()).data(),
+    new_psect, wstring_to_latin1(new_name.filename().wstring()).data()) == ADF_RC_OK;
+}
+
 bool cADFPluginData::CreateDir(std::filesystem::path path) {
   // Allow the function to fail. We know directories may not exist.
   auto maybe_rel_path = LoadFile(std::move(path));
@@ -672,13 +686,13 @@ bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpDat
     case VFSPROP_SUPPORTFILEHASH:
     case VFSPROP_SUPPORTPATHCOMPLETION:
     case VFSPROP_ISEXTRACTABLE:
+    case VFSPROP_USEFULLRENAME:
       *reinterpret_cast<LPBOOL>(lpPropData) = true;
       break;
 
     case VFSPROP_CANDELETESECURE:
     case VFSPROP_CANDELETETOTRASH:
     case VFSPROP_SHOWFILEINFO:
-    case VFSPROP_USEFULLRENAME:
       *reinterpret_cast<LPBOOL>(lpPropData) = false;
       break;
 
@@ -688,7 +702,7 @@ bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpDat
       break;
 
     case VFSPROP_DRAGEFFECTS:
-      *reinterpret_cast<LPDWORD>(lpPropData) = DROPEFFECT_COPY;
+      *reinterpret_cast<LPDWORD>(lpPropData) = DROPEFFECT_COPY | DROPEFFECT_MOVE;
       break;
 
     case VFSPROP_BATCHOPERATION:
@@ -700,17 +714,18 @@ bool cADFPluginData::PropGet(vfsProperty propId, LPVOID lpPropData, LPVOID lpDat
       break;
 
     case VFSPROP_COPYBUFFERSIZE:
-      *reinterpret_cast<LPDWORD>(lpPropData) = 64 << 10;
+      *reinterpret_cast<LPDWORD>(lpPropData) = 64 << 20;
       break;
 
     case VFSPROP_FUNCAVAILABILITY:
       *reinterpret_cast<LPDWORD>(lpPropData) &=
-          ~(VFSFUNCAVAIL_MOVE
+          ~(// VFSFUNCAVAIL_MOVE
             // | VFSFUNCAVAIL_DELETE
             // | VFSFUNCAVAIL_GETSIZES
             // | VFSFUNCAVAIL_MAKEDIR 
-            | VFSFUNCAVAIL_PRINT | VFSFUNCAVAIL_PROPERTIES 
-            | VFSFUNCAVAIL_RENAME | VFSFUNCAVAIL_SETATTR | VFSFUNCAVAIL_SHORTCUT
+            VFSFUNCAVAIL_PRINT | VFSFUNCAVAIL_PROPERTIES 
+            // | VFSFUNCAVAIL_RENAME 
+            | VFSFUNCAVAIL_SETATTR | VFSFUNCAVAIL_SHORTCUT
             //| VFSFUNCAVAIL_SELECTALL
             //| VFSFUNCAVAIL_SELECTNONE
             //| VFSFUNCAVAIL_SELECTINVERT

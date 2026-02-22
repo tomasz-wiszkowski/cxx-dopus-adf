@@ -39,7 +39,12 @@ __declspec(dllexport) BOOL WINAPI VFS_WriteFile(cADFPluginData* data,
                                                 BOOL fFlush,
                                                 LPDWORD lpdwWriteSize);
 
-__declspec(dllexport) void VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile);
+__declspec(dllexport) void WINAPI VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile);
+
+__declspec(dllexport) BOOL WINAPI VFS_MoveFileW(cADFPluginData* hVFSData,
+                                               LPVFSFUNCDATA lpFuncData,
+                                               LPTSTR lpszOldPath,
+                                               LPTSTR lpszNewPath);
 
 __declspec(dllexport) int VFS_ContextVerbW(cADFPluginData* hData,
                                            LPVFSFUNCDATA lpVFSData,
@@ -153,6 +158,10 @@ BOOL VFS_WriteFile(cADFPluginData* data,
 
 void VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile) {
   hData->CloseFile(hFile);
+}
+
+BOOL VFS_MoveFileW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszOldPath, LPTSTR lpszNewPath) {
+  return hData->MoveFile(lpszOldPath, lpszNewPath);
 }
 
 BOOL VFS_CreateDirectoryW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwFlags) {

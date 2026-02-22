@@ -39,6 +39,15 @@ __declspec(dllexport) BOOL WINAPI VFS_WriteFile(cADFPluginData* data,
                                                 BOOL fFlush,
                                                 LPDWORD lpdwWriteSize);
 
+__declspec(dllexport) BOOL WINAPI VFS_SetFileAttrW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwAttr, BOOL fForDelete);
+__declspec(dllexport) BOOL WINAPI VFS_SetFileCommentW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, LPTSTR lpszComment);
+__declspec(dllexport) BOOL WINAPI VFS_SetFileTimeW(cADFPluginData* hData,
+                     LPVFSFUNCDATA lpFuncData,
+                     LPTSTR lpszPath,
+                     LPFILETIME lpCreateTime,
+                     LPFILETIME lpAccessTime,
+                     LPFILETIME lpWriteTime);
+
 __declspec(dllexport) void WINAPI VFS_CloseFile(cADFPluginData* hData, LPVFSFUNCDATA lpVFSData, AdfFile* hFile);
 
 __declspec(dllexport) BOOL WINAPI VFS_MoveFileW(cADFPluginData* hVFSData,
@@ -111,7 +120,7 @@ bool VFS_IdentifyW(LPVFSPLUGININFOW lpVFSInfo) {
   // Initialise plugin information
   lpVFSInfo->idPlugin = GUIDPlugin_ADF;
   lpVFSInfo->dwFlags = VFSF_CANCONFIGURE;
-  lpVFSInfo->dwCapabilities = VFSCAPABILITY_CASESENSITIVE | VFSCAPABILITY_POSTCOPYREREAD | VFSCAPABILITY_MULTICREATEDIR;
+  lpVFSInfo->dwCapabilities = VFSCAPABILITY_CASESENSITIVE | VFSCAPABILITY_POSTCOPYREREAD | VFSCAPABILITY_MULTICREATEDIR | VFSCAPABILITY_MOVEBYRENAME;
 
   StringCchCopyW(lpVFSInfo->lpszHandleExts, lpVFSInfo->cchHandleExtsMax, L".adf;.hdf");
   StringCchCopyW(lpVFSInfo->lpszName, lpVFSInfo->cchNameMax, L"Amiga ADF/HDF");
@@ -250,4 +259,21 @@ LPVFSFILEDATAHEADER VFS_GetFileInformationW(cADFPluginData* data,
                                             HANDLE hHeap,
                                             DWORD dwFlags) {
   return data->GetfileInformation(lpszPath, hHeap);
+}
+
+BOOL VFS_SetFileAttrW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, DWORD dwAttr, BOOL fForDelete) {
+  return false;
+}
+
+BOOL VFS_SetFileCommentW(cADFPluginData* hData, LPVFSFUNCDATA lpFuncData, LPTSTR lpszPath, LPTSTR lpszComment) {
+  return false;
+}
+
+BOOL VFS_SetFileTimeW(cADFPluginData* hData,
+                     LPVFSFUNCDATA lpFuncData,
+                     LPTSTR lpszPath,
+                     LPFILETIME lpCreateTime,
+                     LPFILETIME lpAccessTime,
+                     LPFILETIME lpWriteTime) {
+  return false;
 }

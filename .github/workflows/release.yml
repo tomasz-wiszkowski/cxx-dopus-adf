@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install CMake 4.x and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "~4"
+
+      - name: Set up MSVC x64 developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure (ninja-x64-release)
+        run: cmake --preset ninja-x64-release
+
+      - name: Build (ninja-x64-release)
+        run: cmake --build --preset ninja-x64-release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/Release/opusADF.dll
+          generate_release_notes: true

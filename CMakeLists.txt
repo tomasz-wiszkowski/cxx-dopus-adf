@@ -109,6 +109,7 @@ if(MSVC)
     target_compile_options(opusADF PRIVATE
         /W4      # Warning level
         /wd4100  # Unreferenced formal parameter
+        /EHs-c-  # Disable C++ exceptions
         #$<$<CONFIG:Debug>:/O4 /Zi /d2Zi+ /Zo /Oy>
         $<$<CONFIG:Debug>:/Od>   # Disable optimization for Debug
     )
@@ -122,6 +123,7 @@ else()
     # GCC/Clang flags
     target_compile_options(opusADF PRIVATE
         -Wall
+        -fno-exceptions  # Disable C++ exceptions
         $<$<CONFIG:Debug>:-O0 -g>
         $<$<CONFIG:Release>:-Os -fomit-frame-pointer>
     )
